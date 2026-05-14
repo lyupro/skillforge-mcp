@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillForge MCP — Universal Skills for Any LLM Tool</title>
+  <meta name="description" content="A Model Context Protocol server that loads Markdown skills from arbitrary folders. Lazy-by-design, cross-tool (Claude Code / Codex CLI / Cursor / custom MCP clients).">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="canonical" href="https://lyupro.com/skillforge-mcp">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="SkillForge MCP — Universal Skills for Any LLM Tool">
+  <meta property="og:description" content="Load Markdown skills from arbitrary folders. Lazy by design. Cross-tool. Open source.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lyupro.com/skillforge-mcp">
+
+  <style>
+    /* === Scoped landing styles. Safe for WordPress paste. === */
+    .sfm-landing { --bg: #0f172a; --bg-soft: #1e293b; --fg: #f8fafc; --muted: #94a3b8; --accent: #38bdf8; --accent-strong: #0ea5e9; --good: #4ade80; --warn: #fb923c; --border: #334155; --radius: 12px; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
+    .sfm-landing *, .sfm-landing *::before, .sfm-landing *::after { box-sizing: border-box; }
+    .sfm-landing a { color: var(--accent); text-decoration: none; }
+    .sfm-landing a:hover { text-decoration: underline; }
+    .sfm-landing code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: .9em; background: rgba(56, 189, 248, .12); color: var(--accent); padding: 2px 6px; border-radius: 4px; }
+    .sfm-landing pre { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow-x: auto; }
+    .sfm-landing pre code { background: transparent; color: var(--fg); padding: 0; font-size: .85rem; }
+    .sfm-landing .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .sfm-hero { padding: 80px 0 64px; text-align: center; }
+    .sfm-hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; margin: 0 0 16px; line-height: 1.15; }
+    .sfm-hero .tagline { font-size: clamp(1.05rem, 2vw, 1.25rem); color: var(--muted); margin: 0 auto 32px; max-width: 720px; }
+    .sfm-hero .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+    .sfm-hero .badge { display: inline-block; background: var(--bg-soft); border: 1px solid var(--border); padding: 4px 12px; border-radius: 999px; font-size: .8rem; color: var(--muted); }
+    .sfm-hero .cta-group { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .sfm-cta { display: inline-block; padding: 12px 24px; border-radius: var(--radius); font-weight: 600; text-decoration: none; transition: transform .12s ease, background .12s ease; }
+    .sfm-cta-primary { background: var(--accent-strong); color: white; }
+    .sfm-cta-primary:hover { background: var(--accent); text-decoration: none; transform: translateY(-1px); }
+    .sfm-cta-secondary { background: var(--bg-soft); color: var(--fg); border: 1px solid var(--border); }
+    .sfm-cta-secondary:hover { border-color: var(--accent); text-decoration: none; }
+
+    /* Sections */
+    .sfm-section { padding: 64px 0; border-top: 1px solid var(--border); }
+    .sfm-section h2 { font-size: clamp(1.6rem, 3vw, 2.25rem); font-weight: 700; margin: 0 0 8px; }
+    .sfm-section .lead { color: var(--muted); margin: 0 0 40px; max-width: 720px; }
+
+    /* Grid cards */
+    .sfm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+    .sfm-card { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+    .sfm-card h3 { font-size: 1.1rem; margin: 0 0 8px; font-weight: 600; }
+    .sfm-card p { color: var(--muted); margin: 0; font-size: .95rem; }
+
+    /* Pain/feature paired styling */
+    .sfm-pain .sfm-card { border-left: 3px solid var(--warn); }
+    .sfm-feature .sfm-card { border-left: 3px solid var(--good); }
+
+    /* Calculator */
+    .sfm-calc { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    @media (max-width: 640px) { .sfm-calc { grid-template-columns: 1fr; } }
+    .sfm-calc-inputs label { display: block; margin-bottom: 16px; font-size: .9rem; color: var(--muted); }
+    .sfm-calc-inputs label span { display: block; margin-bottom: 6px; }
+    .sfm-calc-inputs input { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 1rem; font-family: inherit; }
+    .sfm-calc-inputs input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+    .sfm-calc-result { display: flex; flex-direction: column; justify-content: center; }
+    .sfm-calc-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed var(--border); font-size: .95rem; }
+    .sfm-calc-row span:first-child { color: var(--muted); }
+    .sfm-calc-row span:last-child { font-weight: 600; }
+    .sfm-calc-highlight { background: rgba(74, 222, 128, .12); border: 1px solid rgba(74, 222, 128, .35); border-radius: 8px; padding: 16px; margin-top: 16px; text-align: center; }
+    .sfm-calc-highlight .val { font-size: 1.6rem; font-weight: 700; color: var(--good); }
+    .sfm-calc-disclaimer { color: var(--muted); font-size: .8rem; margin-top: 16px; font-style: italic; }
+
+    /* Install tabs */
+    .sfm-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+    .sfm-tabs button { background: transparent; color: var(--muted); border: none; padding: 12px 20px; cursor: pointer; font-size: 1rem; font-family: inherit; border-bottom: 2px solid transparent; transition: color .12s, border-color .12s; }
+    .sfm-tabs button:hover { color: var(--fg); }
+    .sfm-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+    .sfm-tab-panel { display: none; }
+    .sfm-tab-panel[aria-hidden="false"] { display: block; }
+
+    /* Sample skills */
+    .sfm-skills-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .sfm-skill-chip { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+    .sfm-skill-chip strong { display: block; font-size: .95rem; margin-bottom: 4px; }
+    .sfm-skill-chip span { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+    /* Footer */
+    .sfm-footer { padding: 48px 0; text-align: center; color: var(--muted); font-size: .9rem; border-top: 1px solid var(--border); }
+    .sfm-footer a { margin: 0 8px; }
+  </style>
+</head>
+<body class="sfm-landing">
+<div class="sfm-landing">
+
+  <!-- =================== HERO =================== -->
+  <header class="sfm-hero">
+    <div class="container">
+      <h1>Universal Skills, One MCP Server</h1>
+      <p class="tagline">Load Markdown skills from arbitrary folders into <strong>any MCP-capable LLM tool</strong> — Claude Code, Codex CLI, Cursor, or your own client. Lazy-by-design. Cross-tool. Open source.</p>
+      <div class="badges">
+        <span class="badge">v1.0.0</span>
+        <span class="badge">MIT licensed</span>
+        <span class="badge">Node ≥ 20</span>
+        <span class="badge">370+ tests</span>
+      </div>
+      <div class="cta-group">
+        <a class="sfm-cta sfm-cta-primary" href="https://github.com/lyupro/skillforge-mcp">Get Started on GitHub</a>
+        <a class="sfm-cta sfm-cta-secondary" href="https://www.npmjs.com/package/@lyupro/skillforge-mcp">View on npm</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- =================== PAIN =================== -->
+  <section class="sfm-section sfm-pain">
+    <div class="container">
+      <h2>Skill sprawl is real</h2>
+      <p class="lead">Every LLM tool ships its own skill format and discovery mechanism. Team-shared bundles end up duplicated across <code>~/.claude/</code>, <code>~/.codex/</code>, project repos, and a thousand pastebins.</p>
+      <div class="sfm-grid">
+        <div class="sfm-card"><h3>Tool-specific formats</h3><p>Each LLM tool invents its own skill manifest. Cross-pollination requires manual transcription.</p></div>
+        <div class="sfm-card"><h3>Eager auto-load</h3><p>Tools load 100+ skill metadata blocks on every cold start. Tokens burn before the user even types a prompt.</p></div>
+        <div class="sfm-card"><h3>No team registry</h3><p>No standard way to ship a curated skill bundle across a team or organisation.</p></div>
+        <div class="sfm-card"><h3>Scripts = security hole</h3><p>Tools that allow executable skills rarely sandbox them. One malicious skill, one stolen token.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== FEATURES =================== -->
+  <section class="sfm-section sfm-feature">
+    <div class="container">
+      <h2>SkillForge solves it</h2>
+      <p class="lead">One MCP server, one Markdown format, five tools. Drop-in for any MCP-aware client.</p>
+      <div class="sfm-grid">
+        <div class="sfm-card"><h3>Universal Markdown format</h3><p>Single Markdown + YAML frontmatter contract. Four dialects (Claude / Codex / persona / custom) auto-detected.</p></div>
+        <div class="sfm-card"><h3>Lazy by design</h3><p><code>skills__list</code> returns metadata only. Full body fetched on <code>skills__invoke</code>. Cold start stays fast at any skill count.</p></div>
+        <div class="sfm-card"><h3>Cross-tool, one config</h3><p>Multi-folder cascade with priority. Blacklist filter. Hot reload via filesystem watcher. Same server feeds Claude Code, Codex, Cursor.</p></div>
+        <div class="sfm-card"><h3>Honest security</h3><p>PatternScanner audit. Double opt-in for scripts. Sandbox via env whitelist, mkdtemp cwd, AbortSignal kill. Threat model explicit, out-of-scope items called out.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== CALCULATOR =================== -->
+  <section class="sfm-section">
+    <div class="container">
+      <h2>Token savings calculator</h2>
+      <p class="lead">Eager-loading skills burns tokens on every cold start. SkillForge lazy-loads — adjust the inputs to see your monthly savings.</p>
+      <div class="sfm-calc">
+        <div class="sfm-calc-inputs">
+          <label><span>Skills configured (eager-loaded today)</span>
+            <input id="sfm-skills" type="number" min="1" max="1000" value="122">
+          </label>
+          <label><span>Sessions per day</span>
+            <input id="sfm-sessions" type="number" min="1" max="200" value="5">
+          </label>
+          <label><span>Average skills used per session</span>
+            <input id="sfm-used" type="number" min="0" max="50" value="2">
+          </label>
+          <label><span>Avg metadata size per skill (tokens)</span>
+            <input id="sfm-tokens" type="number" min="20" max="500" value="100">
+          </label>
+        </div>
+        <div class="sfm-calc-result">
+          <div class="sfm-calc-row"><span>Tokens burned per session (eager)</span><span id="sfm-eager">—</span></div>
+          <div class="sfm-calc-row"><span>Tokens burned per session (lazy)</span><span id="sfm-lazy">—</span></div>
+          <div class="sfm-calc-row"><span>Saved per session</span><span id="sfm-per">—</span></div>
+          <div class="sfm-calc-row"><span>Saved per day</span><span id="sfm-day">—</span></div>
+          <div class="sfm-calc-highlight">
+            <div>Monthly tokens saved</div>
+            <div class="val" id="sfm-month">—</div>
+          </div>
+          <p class="sfm-calc-disclaimer">Approximation. Assumes 30 sessions/month per session-count input. Actual savings vary with skill metadata size and how aggressively your tool caches metadata across sessions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== INSTALL =================== -->
+  <section class="sfm-section">
+    <div class="container">
+      <h2>Install in 60 seconds</h2>
+      <p class="lead">Pick your tool. Same server, same skills folder, same MCP protocol.</p>
+      <div class="sfm-tabs" role="tablist">
+        <button role="tab" aria-selected="true" aria-controls="sfm-tab-claude" data-target="sfm-tab-claude">Claude Code</button>
+        <button role="tab" aria-selected="false" aria-controls="sfm-tab-codex" data-target="sfm-tab-codex">Codex CLI</button>
+        <button role="tab" aria-selected="false" aria-controls="sfm-tab-cursor" data-target="sfm-tab-cursor">Cursor</button>
+        <button role="tab" aria-selected="false" aria-controls="sfm-tab-custom" data-target="sfm-tab-custom">Custom MCP client</button>
+      </div>
+
+      <div id="sfm-tab-claude" class="sfm-tab-panel" role="tabpanel" aria-hidden="false">
+<pre><code># 1. Install the MCP server
+claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
+
+# 2. Point it at your skills folder (inside any Claude Code session)
+skills__configure { action: "add_folder", folder: "/abs/path/to/your/skills" }
+
+# 3. Use it
+skills__list
+skills__invoke { name: "apple-hig-check", input: "..." }</code></pre>
+      </div>
+
+      <div id="sfm-tab-codex" class="sfm-tab-panel" role="tabpanel" aria-hidden="true">
+<pre><code># 1. Add to ~/.codex/config.toml
+[[mcp_servers]]
+name = "skillforge"
+command = "npx"
+args = ["-y", "@lyupro/skillforge-mcp"]
+
+# 2. Start codex; use the same skills__* tools as in Claude Code</code></pre>
+      </div>
+
+      <div id="sfm-tab-cursor" class="sfm-tab-panel" role="tabpanel" aria-hidden="true">
+<pre><code>// settings.json
+{
+  "mcp.servers": {
+    "skillforge": {
+      "command": "npx",
+      "args": ["-y", "@lyupro/skillforge-mcp"]
+    }
+  }
+}</code></pre>
+      </div>
+
+      <div id="sfm-tab-custom" class="sfm-tab-panel" role="tabpanel" aria-hidden="true">
+<pre><code>// Node.js + @modelcontextprotocol/sdk
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+
+const transport = new StdioClientTransport({
+  command: "npx",
+  args: ["-y", "@lyupro/skillforge-mcp"],
+});
+const client = new Client({ name: "my-app", version: "1.0.0" }, { capabilities: {} });
+await client.connect(transport);
+const skills = await client.callTool({ name: "skills__list", arguments: {} });</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== SAMPLE SKILLS =================== -->
+  <section class="sfm-section">
+    <div class="container">
+      <h2>10 sample skills shipped</h2>
+      <p class="lead">Production-quality, ready to invoke. Covers all three strategies.</p>
+      <div class="sfm-skills-grid">
+        <div class="sfm-skill-chip"><strong>apple-hig-check</strong><span>prompt · 8-axis HIG audit</span></div>
+        <div class="sfm-skill-chip"><strong>refactor-suggester</strong><span>prompt · structured suggestions</span></div>
+        <div class="sfm-skill-chip"><strong>commit-message-writer</strong><span>prompt · conventional commits</span></div>
+        <div class="sfm-skill-chip"><strong>prompt-optimizer</strong><span>prompt · token-aware rewrite</span></div>
+        <div class="sfm-skill-chip"><strong>idea-onepager</strong><span>prompt · venture brief</span></div>
+        <div class="sfm-skill-chip"><strong>obsidian-resume</strong><span>prompt · context restore</span></div>
+        <div class="sfm-skill-chip"><strong>dependency-checker</strong><span>script · npm audit digest</span></div>
+        <div class="sfm-skill-chip"><strong>markdown-linter</strong><span>script · stdlib Python</span></div>
+        <div class="sfm-skill-chip"><strong>changelog-generator</strong><span>hybrid · git log → prompt</span></div>
+        <div class="sfm-skill-chip"><strong>git-blame-summary</strong><span>hybrid · blame digest</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== DOCS =================== -->
+  <section class="sfm-section">
+    <div class="container">
+      <h2>Documentation</h2>
+      <p class="lead">Every artifact ships with the v1.0.0 release.</p>
+      <div class="sfm-grid">
+        <div class="sfm-card"><h3><a href="https://github.com/lyupro/skillforge-mcp#readme">README</a></h3><p>Quick start, 60-second install, pain/solution matrix.</p></div>
+        <div class="sfm-card"><h3><a href="https://github.com/lyupro/skillforge-mcp/blob/master/docs/INSTALL.md">INSTALL</a></h3><p>4 wiring tracks, folder-config 3 ways, troubleshooting matrix.</p></div>
+        <div class="sfm-card"><h3><a href="https://github.com/lyupro/skillforge-mcp/blob/master/docs/SKILL_FORMAT.md">SKILL_FORMAT</a></h3><p>Frontmatter contract, 4 dialects, strategy decision tree, 5 worked examples.</p></div>
+        <div class="sfm-card"><h3><a href="https://github.com/lyupro/skillforge-mcp/blob/master/docs/CONFIGURATION.md">CONFIGURATION</a></h3><p>Env vars, persisted JSON, full schema, configure-tool actions.</p></div>
+        <div class="sfm-card"><h3><a href="https://github.com/lyupro/skillforge-mcp/blob/master/docs/ARCHITECTURE.md">ARCHITECTURE</a></h3><p>Module map, 9 design patterns, full invocation flow trace, extension points.</p></div>
+        <div class="sfm-card"><h3><a href="https://github.com/lyupro/skillforge-mcp/blob/master/docs/SECURITY.md">SECURITY</a></h3><p>Threat model, sandbox contract, defence layers, responsible disclosure.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== FOOTER =================== -->
+  <footer class="sfm-footer">
+    <div class="container">
+      <p><a href="https://github.com/lyupro/skillforge-mcp">GitHub</a> · <a href="https://www.npmjs.com/package/@lyupro/skillforge-mcp">npm</a> · <a href="https://github.com/lyupro/skillforge-mcp/issues">Issues</a> · <a href="https://github.com/lyupro/skillforge-mcp/security/advisories">Security</a> · <a href="https://lyupro.com">Lyu Pro</a></p>
+      <p>© 2026 Lyu Pro · MIT licensed · Built for the Model Context Protocol ecosystem.</p>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  // Token savings calculator
+  function calc() {
+    var skills = parseInt(document.getElementById('sfm-skills').value, 10) || 0;
+    var sessions = parseInt(document.getElementById('sfm-sessions').value, 10) || 0;
+    var used = parseInt(document.getElementById('sfm-used').value, 10) || 0;
+    var perTok = parseInt(document.getElementById('sfm-tokens').value, 10) || 0;
+    var eager = skills * perTok;
+    var lazy = used * perTok + perTok;
+    var perSession = Math.max(0, eager - lazy);
+    var perDay = perSession * sessions;
+    var perMonth = perDay * 30;
+    var fmt = function (n) { return n.toLocaleString('en-US'); };
+    document.getElementById('sfm-eager').textContent = fmt(eager) + ' tokens';
+    document.getElementById('sfm-lazy').textContent = fmt(lazy) + ' tokens';
+    document.getElementById('sfm-per').textContent = fmt(perSession) + ' tokens';
+    document.getElementById('sfm-day').textContent = fmt(perDay) + ' tokens';
+    document.getElementById('sfm-month').textContent = fmt(perMonth) + ' tokens';
+  }
+  ['sfm-skills', 'sfm-sessions', 'sfm-used', 'sfm-tokens'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', calc);
+  });
+  calc();
+
+  // Install tabs
+  document.querySelectorAll('.sfm-tabs button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = btn.getAttribute('data-target');
+      document.querySelectorAll('.sfm-tabs button').forEach(function (b) {
+        b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+      });
+      document.querySelectorAll('.sfm-tab-panel').forEach(function (p) {
+        p.setAttribute('aria-hidden', p.id === target ? 'false' : 'true');
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "folders": [
+    {
+      "path": "~/.lyupro/skills/repo",
+      "priority": 300,
+      "enabled": true,
+      "tags": ["repo", "project"]
+    },
+    {
+      "path": "~/.lyupro/skills/user",
+      "priority": 200,
+      "enabled": true,
+      "tags": ["skillforge-bundle"]
+    },
+    {
+      "path": "~/.claude/plugins/cache/claude-code-skills",
+      "priority": 100,
+      "enabled": true,
+      "tags": ["claude-native"]
+    }
+  ],
+  "blacklist": [
+    "draft-old-experiment",
+    "deprecated-onepager-v1"
+  ],
+  "security": {
+    "autoAudit": true,
+    "auditPatterns": [
+      "shell=True",
+      "eval\\(",
+      "exec\\(",
+      "base64\\.b64decode",
+      "subprocess\\.(call|run|Popen)",
+      "os\\.system"
+    ],
+    "allowScripts": true,
+    "sandboxScripts": true,
+    "sandboxRestrictedPaths": ["~/.ssh", "~/.aws", "~/.gnupg"]
+  },
+  "cache": {
+    "metadataTtlMs": 300000,
+    "contentTtlMs": 300000,
+    "maxSizeMb": 50
+  },
+  "watcher": {
+    "enabled": true,
+    "debounceMs": 1000
+  },
+  "logging": {
+    "level": "info",
+    "file": null
+  },
+  "invocation": {
+    "defaultTimeoutMs": 45000,
+    "cacheTtlMs": 120000,
+    "cacheMaxEntries": 256
+  }
+}

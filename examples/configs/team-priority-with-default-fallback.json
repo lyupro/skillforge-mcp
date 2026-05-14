@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "folders": [
+    {
+      "path": "/home/me/team-skills",
+      "priority": 200,
+      "enabled": true,
+      "tags": ["team"]
+    },
+    {
+      "path": "/home/me/.claude/plugins/cache/claude-code-skills",
+      "priority": 100,
+      "enabled": true,
+      "tags": ["claude-native"]
+    }
+  ],
+  "blacklist": [],
+  "security": {
+    "autoAudit": true,
+    "auditPatterns": [
+      "shell=True",
+      "eval\\(",
+      "exec\\(",
+      "base64\\.b64decode"
+    ],
+    "allowScripts": false,
+    "sandboxScripts": true,
+    "sandboxRestrictedPaths": ["~/.ssh", "~/.aws", "~/.gnupg"]
+  },
+  "cache": {
+    "metadataTtlMs": 300000,
+    "contentTtlMs": 300000,
+    "maxSizeMb": 50
+  },
+  "watcher": {
+    "enabled": true,
+    "debounceMs": 500
+  },
+  "logging": {
+    "level": "info",
+    "file": null
+  },
+  "invocation": {
+    "defaultTimeoutMs": 30000,
+    "cacheTtlMs": 60000,
+    "cacheMaxEntries": 128
+  }
+}

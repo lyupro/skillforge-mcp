@@ -1,0 +1,96 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/manifest.json",
+  "name": "@lyupro/skillforge-mcp",
+  "displayName": "SkillForge MCP",
+  "version": "1.0.0",
+  "description": "Universal Skills MCP server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
+  "author": {
+    "name": "lyupro",
+    "url": "https://lyupro.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lyupro/skillforge-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lyupro/skillforge-mcp.git"
+  },
+  "bugs": "https://github.com/lyupro/skillforge-mcp/issues",
+  "keywords": [
+    "mcp",
+    "skills",
+    "claude-code",
+    "codex",
+    "cursor",
+    "model-context-protocol",
+    "ai-agents",
+    "prompt-engineering",
+    "lazy-loading",
+    "cross-tool"
+  ],
+  "categories": ["productivity", "developer-tools", "ai-agents"],
+  "runtime": {
+    "type": "node",
+    "engines": {
+      "node": ">=20.0.0"
+    },
+    "entry": "./dist/server.js",
+    "bin": "skillforge-mcp"
+  },
+  "transport": "stdio",
+  "tools": [
+    {
+      "name": "skills__list",
+      "description": "Enumerate available skills (metadata only). Filters: folder, search, source."
+    },
+    {
+      "name": "skills__get",
+      "description": "Retrieve the full content (body + metadata) of a named skill."
+    },
+    {
+      "name": "skills__invoke",
+      "description": "Invoke a skill by name, forwarding optional input. Composite skills (metadata.skills) walk nested skills sequentially with DFS cycle detection. Pipeline: Logging → Timeout → Cache → strategy (Prompt / Script / Hybrid)."
+    },
+    {
+      "name": "skills__configure",
+      "description": "Manage configured skill folders, blacklist, and reset to defaults. Actions: add_folder, remove_folder, list_folders, set_blacklist, get_blacklist, reset. Persists to the platform config path."
+    },
+    {
+      "name": "skills__reload",
+      "description": "Force a full rescan of all configured folders. Returns { loaded, added, removed, errors } diff against the previous registry snapshot."
+    }
+  ],
+  "environment": {
+    "SKILLFORGE_FOLDERS": {
+      "description": "Override folder list (path-separator: ':' POSIX, ';' Windows). When set, overrides persisted folders[] entirely.",
+      "required": false
+    },
+    "SKILLFORGE_TTL_MS": {
+      "description": "Metadata cache TTL in ms. Default 300000 (5 min).",
+      "required": false
+    }
+  },
+  "documentation": {
+    "readme": "./README.md",
+    "install": "./docs/INSTALL.md",
+    "skillFormat": "./docs/SKILL_FORMAT.md",
+    "configuration": "./docs/CONFIGURATION.md",
+    "architecture": "./docs/ARCHITECTURE.md",
+    "security": "./docs/SECURITY.md",
+    "integration": {
+      "claudeCode": "./docs/INTEGRATION/claude-code.md",
+      "codex": "./docs/INTEGRATION/codex.md",
+      "cursor": "./docs/INTEGRATION/cursor.md",
+      "customLlmTools": "./docs/INTEGRATION/custom-llm-tools.md"
+    }
+  },
+  "samples": {
+    "skills": "./skills",
+    "configs": "./examples/configs"
+  },
+  "verification": {
+    "smokeTest": "pnpm smoke",
+    "testCommand": "pnpm test",
+    "lintCommand": "pnpm lint",
+    "sizeGate": "pnpm check:size"
+  }
+}

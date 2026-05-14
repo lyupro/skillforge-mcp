@@ -1,0 +1,273 @@
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { ensureRegistryFresh, rebuildRegistry } from './loader.js';
+import { SkillRegistry } from '../core/skill-registry.js';
+import { SkillResolver } from '../core/skill-resolver.js';
+import { SkillMetadataCache } from '../core/skill-metadata-cache.js';
+import { SkillContentCache } from '../core/skill-content-cache.js';
+import { StrategyFactory } from '../factory/strategy-factory.js';
+import { PromptStrategy } from '../handlers/prompt-strategy.js';
+import { BlacklistFilter } from '../security/blacklist-filter.js';
+import { PatternScanner } from '../security/pattern-scanner.js';
+import { SandboxRunner } from '../security/sandbox-runner.js';
+import { DecoratorChain, stderrLogger } from '../decorators/index.js';
+import type { ServerDeps } from '../server-deps.js';
+import type { SkillContent } from '../core/types.js';
+
+function makeContent(name: string, folder: string): SkillContent {
+  return {
+    name,
+    description: `Desc of ${name}`,
+    sourcePath: `${folder}/${name}.md`,
+    folder,
+    tags: [],
+    format: 'claude',
+    allowScripts: false,
+    allowNetwork: false,
+    body: `Body of ${name}`,
+    raw: `---\nname: ${name}\n---\nBody of ${name}`,
+  };
+}
+
+function makeDeps(overrides: Partial<{
+  folders: string[];
+  scanResults: Map<string, string[]>;
+  parseResults: Map<string, SkillContent>;
+  scanError?: Map<string, Error>;
+  parseError?: Map<string, Error>;
+  cacheValid: boolean;
+  blacklistFilter: BlacklistFilter;
+}>): ServerDeps {
+  const folders = overrides.folders ?? ['/skills'];
+  const scanResults = overrides.scanResults ?? new Map();
+  const parseResults = overrides.parseResults ?? new Map();
+  const scanErrors = overrides.scanError ?? new Map();
+  const parseErrors = overrides.parseError ?? new Map();
+  const cacheValid = overrides.cacheValid ?? false;
+
+  return {
+    folders,
+    registry: new SkillRegistry(),
+    resolver: new SkillResolver(),
+    metadataCache: {
+      isValid: () => cacheValid,
+      markFresh: vi.fn(),
+      invalidate: vi.fn(),
+      expiresAt: () => null,
+      ttlMs: 300_000,
+    } as unknown as SkillMetadataCache,
+    contentCache: new SkillContentCache({ ttlMs: 300_000 }),
+    scanner: {
+      scan: vi.fn(async (folder: string) => {
+        if (scanErrors.has(folder)) throw scanErrors.get(folder)!;
+        return scanResults.get(folder) ?? [];
+      }),
+    } as unknown as import('../parser/file-scanner.js').FileScanner,
+    parser: {
+      parseFile: vi.fn(async (filePath: string, _folder: string) => {
+        if (parseErrors.has(filePath)) throw parseErrors.get(filePath)!;
+        if (parseResults.has(filePath)) return parseResults.get(filePath)!;
+        throw new Error(`No parse result registered for ${filePath}`);
+      }),
+    } as unknown as import('../parser/frontmatter-parser.js').FrontmatterParser,
+    factory: new StrategyFactory([new PromptStrategy()]),
+    blacklistFilter: overrides.blacklistFilter ?? new BlacklistFilter(),
+    logger: stderrLogger,
+    sandboxRunner: new SandboxRunner({}),
+    decoratorChain: new DecoratorChain({ logger: stderrLogger, defaultTimeoutMs: 5_000, cacheTtlMs: 60_000, cacheMaxEntries: 10 }),
+  };
+}
+
+describe('ensureRegistryFresh', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns immediately when cache is valid', async () => {
+    const deps = makeDeps({ cacheValid: true });
+    const scanSpy = vi.spyOn(deps.scanner, 'scan');
+    await ensureRegistryFresh(deps);
+    expect(scanSpy).not.toHaveBeenCalled();
+  });
+
+  it('populates registry and content cache, marks cache fresh after full scan', async () => {
+    const folder = '/skills';
+    const content = makeContent('apple-hig-check', folder);
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/apple-hig-check.md`]]]),
+      parseResults: new Map([[`${folder}/apple-hig-check.md`, content]]),
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(deps.registry.has('apple-hig-check')).toBe(true);
+    expect(deps.contentCache.get('apple-hig-check')).toMatchObject({ name: 'apple-hig-check' });
+    expect(deps.metadataCache.markFresh).toHaveBeenCalledOnce();
+  });
+
+  it('skips malformed skill file with stderr warning and continues', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const folder = '/skills';
+    const goodContent = makeContent('good-skill', folder);
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/bad.md`, `${folder}/good-skill.md`]]]),
+      parseResults: new Map([[`${folder}/good-skill.md`, goodContent]]),
+      parseError: new Map([[`${folder}/bad.md`, new Error('bad frontmatter')]]),
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('/skills/bad.md'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('bad frontmatter'));
+    expect(deps.registry.has('good-skill')).toBe(true);
+    expect(deps.registry.has('bad')).toBe(false);
+  });
+
+  it('skips missing folder with stderr warning and continues with remaining folders', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const folder1 = '/missing';
+    const folder2 = '/present';
+    const content = makeContent('my-skill', folder2);
+    const deps = makeDeps({
+      folders: [folder1, folder2],
+      scanResults: new Map([[folder2, [`${folder2}/my-skill.md`]]]),
+      parseResults: new Map([[`${folder2}/my-skill.md`, content]]),
+      scanError: new Map([[folder1, new Error('Folder not found: /missing')]]),
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('/missing'));
+    expect(deps.registry.has('my-skill')).toBe(true);
+  });
+
+  it('manual blacklist excludes a skill by name, keeps others', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const folder = '/skills';
+    const contentX = makeContent('skill-x', folder);
+    const contentY = makeContent('skill-y', folder);
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/skill-x.md`, `${folder}/skill-y.md`]]]),
+      parseResults: new Map([
+        [`${folder}/skill-x.md`, contentX],
+        [`${folder}/skill-y.md`, contentY],
+      ]),
+      blacklistFilter: new BlacklistFilter({ manualBlacklist: ['skill-x'] }),
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(deps.registry.has('skill-x')).toBe(false);
+    expect(deps.registry.has('skill-y')).toBe(true);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('blacklisted by name'));
+  });
+
+  it('auto-audit excludes skill with eval( in body, keeps clean skill', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const folder = '/skills';
+    const evilContent = makeContent('evil-skill', folder);
+    evilContent.body = 'eval(user_input)';
+    const cleanContent = makeContent('clean-skill', folder);
+    cleanContent.body = 'print("hello")';
+
+    const scanner = new PatternScanner({ patterns: ['eval\\(', 'exec\\(', 'shell=True', 'base64\\.b64decode'] });
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/evil-skill.md`, `${folder}/clean-skill.md`]]]),
+      parseResults: new Map([
+        [`${folder}/evil-skill.md`, evilContent],
+        [`${folder}/clean-skill.md`, cleanContent],
+      ]),
+      blacklistFilter: new BlacklistFilter({ patternScanner: scanner }),
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(deps.registry.has('evil-skill')).toBe(false);
+    expect(deps.registry.has('clean-skill')).toBe(true);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('audit hit: eval\\('));
+  });
+
+  it('resolves conflict to higher-priority folder winner', async () => {
+    const folder1 = '/priority-1';
+    const folder2 = '/priority-2';
+    const content1 = makeContent('shared-skill', folder1);
+    const content2 = makeContent('shared-skill', folder2);
+    const deps = makeDeps({
+      folders: [folder1, folder2],
+      scanResults: new Map([
+        [folder1, [`${folder1}/shared-skill.md`]],
+        [folder2, [`${folder2}/shared-skill.md`]],
+      ]),
+      parseResults: new Map([
+        [`${folder1}/shared-skill.md`, content1],
+        [`${folder2}/shared-skill.md`, content2],
+      ]),
+    });
+
+    await ensureRegistryFresh(deps);
+
+    const winner = deps.registry.get('shared-skill');
+    expect(winner?.folder).toBe(folder1);
+    const cachedContent = deps.contentCache.get('shared-skill');
+    expect(cachedContent?.folder).toBe(folder1);
+  });
+});
+
+describe('rebuildRegistry', () => {
+  it('errorSink supplied + scanner throws → error pushed to sink, NOT to stderr', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const folder = '/missing';
+    const deps = makeDeps({
+      folders: [folder],
+      scanError: new Map([[folder, new Error('folder not found')]]),
+    });
+
+    const sink: Array<{ path: string; message: string }> = [];
+    const stats = await rebuildRegistry(deps, { errorSink: sink });
+
+    expect(sink).toHaveLength(1);
+    expect(sink[0]?.path).toBe(folder);
+    expect(sink[0]?.message).toContain('folder not found');
+    // stderr must NOT contain the scan error when a sink is provided.
+    const stderrCalls = errSpy.mock.calls.map((c) => String(c[0]));
+    expect(stderrCalls.some((m) => m.includes('folder not found'))).toBe(false);
+    expect(stats.errors).toBe(sink);
+  });
+
+  it('no errorSink + scanner throws → stderr message preserved (existing behavior)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const folder = '/missing';
+    const deps = makeDeps({
+      folders: [folder],
+      scanError: new Map([[folder, new Error('folder not found')]]),
+    });
+
+    const stats = await rebuildRegistry(deps);
+
+    // Error goes to stderr, NOT to the returned errors array.
+    const stderrCalls = errSpy.mock.calls.map((c) => String(c[0]));
+    expect(stderrCalls.some((m) => m.includes('folder not found'))).toBe(true);
+    expect(stats.errors).toEqual([]);
+  });
+
+  it('returns sorted skill names in stats.skills', async () => {
+    const folder = '/skills';
+    const contentZ = makeContent('zebra-skill', folder);
+    const contentA = makeContent('alpha-skill', folder);
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/zebra-skill.md`, `${folder}/alpha-skill.md`]]]),
+      parseResults: new Map([
+        [`${folder}/zebra-skill.md`, contentZ],
+        [`${folder}/alpha-skill.md`, contentA],
+      ]),
+    });
+
+    const stats = await rebuildRegistry(deps);
+
+    expect(stats.skills).toEqual(['alpha-skill', 'zebra-skill']);
+  });
+});

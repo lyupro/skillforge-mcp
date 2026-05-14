@@ -1,0 +1,74 @@
+{
+  "name": "@lyupro/skillforge-mcp",
+  "version": "1.0.0",
+  "description": "Universal Skills MCP Server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
+  "keywords": [
+    "mcp",
+    "skills",
+    "claude-code",
+    "codex",
+    "model-context-protocol",
+    "ai-agents",
+    "prompt-engineering"
+  ],
+  "license": "MIT",
+  "author": "lyupro (https://lyupro.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lyupro/skillforge-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lyupro/skillforge-mcp/issues"
+  },
+  "homepage": "https://github.com/lyupro/skillforge-mcp#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "bin": {
+    "skillforge-mcp": "./dist/server.js"
+  },
+  "files": [
+    "dist",
+    "manifest.json",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "check:size": "node scripts/check-file-size.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "prepare": "simple-git-hooks",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "chokidar": "^3.6.0",
+    "gray-matter": "^4.0.3",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "glob": "^11.0.0",
+    "simple-git-hooks": "^2.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "node scripts/check-file-size.mjs --error"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

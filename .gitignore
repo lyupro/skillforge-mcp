@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Environment variables (tokens, keys)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Lock files (PID only — keep package/pnpm-lock)
+*.lock
+!package-lock.json
+!pnpm-lock.yaml
+
+# Temp files
+*.tmp
+*.bak
+
+# OMC artifacts (per-session, not tracked)
+**/.omc/
