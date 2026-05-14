@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.0.0** — 5 MCP tools, 370 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.1.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, 451 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -24,6 +24,14 @@ One skill folder. One config file. Any tool can ask for any skill on demand.
 | Hardcoded paths (`~/.claude/plugins/cache/...`, `~/.codex/skills/`) | One folder, one tool, hardcoded | Multi-folder, per-project, priority-ordered, env override |
 | No cross-tool format | Each tool ships its own skill layout | Universal frontmatter parser auto-detects Claude / Codex / persona / custom dialects |
 | Skill execution = "just inline body in prompt" | No scripts, no caching, no timeouts, no composition | Strategy pattern (prompt / script / hybrid) + decorator chain (logging → timeout → cache) + composite skills with cycle detection |
+
+## One-command install (v1.1)
+
+```bash
+npx @lyupro/skillforge-mcp install --all
+```
+
+Auto-detects Claude Code, Codex CLI, and Cursor on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`. Full reference: [docs/INSTALL_CLI.md](./docs/INSTALL_CLI.md).
 
 ## Quick Start
 

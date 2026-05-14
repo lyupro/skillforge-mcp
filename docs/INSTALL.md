@@ -9,6 +9,18 @@ This guide covers wiring SkillForge MCP into the four supported integrations:
 
 For per-tool deep dives, see [INTEGRATION/](./INTEGRATION/).
 
+## Install CLI (v1.1)
+
+Starting with v1.1, `skillforge install` edits each host tool's config file for you:
+
+```bash
+npx @lyupro/skillforge-mcp install --all
+```
+
+It supports `--claude` / `--codex` / `--cursor` / `--all`, plus `--dry-run`, `--uninstall`, `--force`, and `--entry npx|local`. Writes are atomic and snapshot the previous content into `<path>.backup`. Full reference: [INSTALL_CLI.md](./INSTALL_CLI.md).
+
+The manual wiring sections below remain the canonical reference for users who prefer to edit configs by hand or for environments where `npx` cannot run.
+
 ---
 
 ## Prerequisites

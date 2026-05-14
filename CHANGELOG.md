@@ -2,6 +2,27 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-05-14
+
+One-command install across Claude Code, Codex CLI, and Cursor.
+
+### Added
+
+- `skillforge install` CLI — wires SkillForge MCP into host tools by editing each host's config file directly.
+- Three installers — Claude Code (`~/.claude.json`), Codex CLI (`~/.codex/config.toml`), Cursor (OS-specific `settings.json`).
+- Flags — `--claude`, `--codex`, `--cursor`, `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry npx|local`, `--binary-path <path>`.
+- Atomic-write helper with `.backup` snapshot — failed write never leaves the host config in a broken state.
+- OS-specific path detection for Cursor (Windows `%APPDATA%`, macOS `Library/Application Support`, Linux `~/.config`).
+- Second package bin — `skillforge` → `./dist/cli/install.js` alongside the existing `skillforge-mcp` stdio server entry.
+- New documentation — [docs/INSTALL_CLI.md](./docs/INSTALL_CLI.md) (flag table, examples, host edit shapes, troubleshooting).
+
+### Verified
+
+- 451 / 451 tests passing + 1 win32-skip (+81 new tests for the install CLI).
+- `pnpm lint` (`tsc --noEmit`) clean.
+- `pnpm build` clean.
+- `pnpm check:size` — all 54 source files ≤ 400 lines.
+
 ## [1.0.0] — 2026-05-13
 
 First public release. Universal Skills MCP server: load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / Cursor / custom MCP clients).
@@ -89,4 +110,5 @@ All 10 verified through real parse pipeline + `StrategyFactory.create()` correct
 - **`pnpm build`** clean.
 - **`pnpm smoke`** end-to-end via subprocess `dist/server.js` — LoggingDecorator trace visible.
 
+[1.1.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.1.0
 [1.0.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.0.0
