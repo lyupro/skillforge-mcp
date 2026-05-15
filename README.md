@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.1.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, 451 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.1.1** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, 462 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
