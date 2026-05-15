@@ -5,7 +5,8 @@
   "version": "1.1.1",
   "description": "Universal Skills MCP server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
   "author": {
-    "name": "lyupro",
+    "name": "Lyu Pro",
+    "email": "lyupro.dev@gmail.com",
     "url": "https://lyupro.com"
   },
   "license": "MIT",

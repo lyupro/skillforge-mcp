@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "skillforge",
+  "description": "SkillForge — universal Markdown skills for Claude Code and any MCP client.",
+  "owner": {
+    "name": "Lyu Pro",
+    "email": "lyupro.dev@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "skillforge",
+      "source": {
+        "source": "npm",
+        "package": "@lyupro/skillforge-mcp"
+      },
+      "description": "Universal Skills MCP server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool.",
+      "version": "1.1.1",
+      "author": {
+        "name": "Lyu Pro",
+        "email": "lyupro.dev@gmail.com"
+      },
+      "homepage": "https://github.com/lyupro/skillforge-mcp",
+      "repository": "https://github.com/lyupro/skillforge-mcp",
+      "license": "MIT",
+      "keywords": [
+        "skills",
+        "mcp",
+        "productivity",
+        "developer-tools",
+        "cross-tool",
+        "lazy-loading"
+      ],
+      "category": "productivity"
+    }
+  ]
+}

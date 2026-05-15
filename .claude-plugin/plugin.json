@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "skillforge",
+  "version": "1.1.1",
+  "description": "Universal Skills MCP server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool.",
+  "author": {
+    "name": "Lyu Pro",
+    "email": "lyupro.dev@gmail.com",
+    "url": "https://lyupro.com"
+  },
+  "homepage": "https://github.com/lyupro/skillforge-mcp",
+  "repository": "https://github.com/lyupro/skillforge-mcp",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "mcp",
+    "productivity",
+    "developer-tools",
+    "cross-tool",
+    "lazy-loading"
+  ],
+  "mcpServers": {
+    "skillforge": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/cli/dispatcher.js", "serve"]
+    }
+  }
+}

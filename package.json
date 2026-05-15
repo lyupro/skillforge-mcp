@@ -12,7 +12,7 @@
     "prompt-engineering"
   ],
   "license": "MIT",
-  "author": "lyupro (https://lyupro.com)",
+  "author": "Lyu Pro <lyupro.dev@gmail.com> (https://lyupro.com)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lyupro/skillforge-mcp.git"
@@ -33,6 +33,7 @@
   },
   "files": [
     "dist",
+    ".claude-plugin",
     "manifest.json",
     "README.md",
     "LICENSE",
