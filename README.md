@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.1.1** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, 462 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.2.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, terminal `tools` + `folders` subcommands, global/project install scopes, Claude Code plugin packaging, 535 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -25,21 +25,37 @@ One skill folder. One config file. Any tool can ask for any skill on demand.
 | No cross-tool format | Each tool ships its own skill layout | Universal frontmatter parser auto-detects Claude / Codex / persona / custom dialects |
 | Skill execution = "just inline body in prompt" | No scripts, no caching, no timeouts, no composition | Strategy pattern (prompt / script / hybrid) + decorator chain (logging → timeout → cache) + composite skills with cycle detection |
 
-## One-command install (v1.1)
+## One-command install
 
 ```bash
 npx @lyupro/skillforge-mcp install --all
 ```
 
-Auto-detects Claude Code, Codex CLI, and Cursor on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`. Full reference: [docs/INSTALL_CLI.md](./docs/INSTALL_CLI.md).
+Auto-detects Claude Code, Codex CLI, and Cursor on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`.
+
+By default the installer edits each host's global config. Pass `--scope project` to wire SkillForge into a repo-local config rooted at the current directory instead — `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor):
+
+```bash
+npx @lyupro/skillforge-mcp install --all --scope project
+```
+
+Full reference: [docs/INSTALL_CLI.md](./docs/INSTALL_CLI.md).
 
 ## Quick Start
 
-### Option 1 — Claude Code marketplace (recommended)
+### Option 1 — Claude Code plugin (recommended)
+
+SkillForge ships a Claude Code plugin manifest, so it installs through the native `/plugins` UI with a rich plugin card:
 
 ```bash
-/plugin marketplace add lyupro/llm-plugins-marketplace
-/plugin install skillforge-mcp@lyupro-llm-plugins
+/plugin marketplace add lyupro/skillforge-mcp
+/plugin install skillforge
+```
+
+Or install it directly:
+
+```bash
+claude plugin install skillforge@lyupro/skillforge-mcp
 ```
 
 Restart your Claude Code session. The five tools (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) appear in the tool list.
@@ -50,7 +66,11 @@ Restart your Claude Code session. The five tools (`skills__list`, `skills__get`,
 claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
 ```
 
-Works for any MCP host that can spawn a stdio command (Claude Code, Codex CLI, Cursor).
+Works for any MCP host that can spawn a stdio command (Claude Code, Codex CLI, Cursor). Or let the install CLI wire every detected host at once:
+
+```bash
+npx -y @lyupro/skillforge-mcp install --all
+```
 
 ### Option 3 — local build
 
@@ -74,6 +94,54 @@ After the install step, run these three checks from inside any wired LLM tool se
 3. `skills__reload` — forces a fresh scan, returns `{loaded, added, removed, errors}` diff.
 
 If any call fails with `[skillforge] fatal:` on stderr, the most likely cause is a corrupt config file or a missing folder path — the error message points at the offending file. Delete or fix `~/.lyupro/.skillforge/config.json` and retry.
+
+## CLI commands
+
+The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positional argument selects a subcommand. Run `skillforge --help` for the full list.
+
+| Command | Purpose |
+|---------|---------|
+| `serve` | Run the stdio MCP server. Default when no command is given. |
+| `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor. Flags: `--claude` / `--codex` / `--cursor` / `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
+| `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
+| `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
+| `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `reset`. |
+| `--version`, `-v` | Print the package version. |
+| `--help`, `-h` | Print combined usage. |
+
+### Inspect the MCP tools — `skillforge tools`
+
+```bash
+skillforge tools          # human-readable reference
+skillforge tools --json   # machine-readable: { "tools": [ ... ] }
+```
+
+Prints every MCP tool the server exposes (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) with its description, parameters, and an example invocation — handy for confirming the surface without starting a session.
+
+### Manage skill folders from the terminal — `skillforge folders`
+
+Folder management is also available from the shell, not just via the `skills__configure` MCP tool inside an LLM session:
+
+```bash
+skillforge folders list [--json]                        # print registered folders
+skillforge folders add <path> [flags]                   # register a folder
+skillforge folders remove <path>                         # remove a folder entry
+skillforge folders reset --yes                           # reset folders to the default (empty) list
+```
+
+`add` flags:
+
+- `--priority <n>` — folder priority (default `100`; higher wins on name collisions).
+- `--tags <a,b,c>` — comma-separated tags.
+- `--disabled` — register the folder disabled.
+
+```bash
+skillforge folders add ~/.lyupro/skills --priority 50 --tags work,review
+```
+
+`reset` requires `--yes` to apply — without it, the command prints what would change and makes no edits. All `folders` actions read and write the same persisted config (`~/.lyupro/.skillforge/config.json`) as the `skills__configure` MCP tool.
+
+If you register a folder that already lives inside another tool's native skill store (a Claude Code plugin cache or a Gemini CLI extension), `folders add` prints a hint to disable the duplicate source so the same skills don't load twice. SkillForge only prints the hint — it never edits another tool's config.
 
 ## MCP tool surface
 
@@ -166,8 +234,8 @@ For production use with untrusted skill authors, run SkillForge inside Docker or
 ## Updating
 
 ```bash
-# Marketplace install
-/plugin update skillforge-mcp@lyupro-llm-plugins
+# Plugin install
+/plugin update skillforge
 
 # npm install
 claude mcp remove skillforge

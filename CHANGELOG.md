@@ -2,6 +2,25 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-16
+
+Terminal-side tooling — inspect MCP tools and manage skill folders without an LLM session, plus repo-local install scope and Claude Code plugin packaging.
+
+### Added
+
+- `skillforge tools` CLI subcommand — prints the 5 MCP tools the server exposes (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) with each tool's description, parameters, and an example invocation. Pass `--json` for machine-readable output. Lets you confirm the tool surface without starting an LLM session.
+- `skillforge folders` CLI subcommand — manage skill folders from the terminal: `folders list [--json]`, `folders add <path> [--priority N] [--tags a,b] [--disabled]`, `folders remove <path>`, `folders reset --yes`. Previously folder management was only reachable via the `skills__configure` MCP tool inside an LLM session; both surfaces now read and write the same persisted config.
+- `--scope global|project` flag on `skillforge install` / `skillforge uninstall`. The default `global` scope edits each host's home-directory config (unchanged behavior). `--scope project` wires SkillForge into a repo-local config rooted at the current directory — `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor).
+- Skill-source conflict detection. Registering a folder that already lives inside another tool's native skill store (a Claude Code plugin cache or a Gemini CLI extension) now surfaces a hint to disable the duplicate source — otherwise the same skills load twice and skill names collide. The `folders add` CLI prints the hint; the `skills__configure` `add_folder` action returns it as a `conflictHint` field. The conflict is informational only — it never blocks the folder from being added, and SkillForge never edits another tool's config.
+- Claude Code plugin packaging — `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`. SkillForge can now be installed via `claude plugin install` (rich `/plugins` UI card) in addition to `claude mcp add` and `skillforge install`.
+
+### Verified
+
+- 535 / 535 tests passing + 1 win32-skip.
+- `pnpm lint` (`tsc --noEmit`) clean.
+- `pnpm build` clean.
+- `pnpm check:size` — all source files ≤ 400 lines.
+
 ## [1.1.1] — 2026-05-15
 
 Single-bin dispatcher — fixes `npx @lyupro/skillforge-mcp install --all` hanging on stdin.
@@ -138,5 +157,7 @@ All 10 verified through real parse pipeline + `StrategyFactory.create()` correct
 - **`pnpm build`** clean.
 - **`pnpm smoke`** end-to-end via subprocess `dist/server.js` — LoggingDecorator trace visible.
 
+[1.2.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.2.0
+[1.1.1]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.1.1
 [1.1.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.1.0
 [1.0.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.0.0

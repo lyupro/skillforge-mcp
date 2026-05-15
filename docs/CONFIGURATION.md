@@ -46,6 +46,36 @@ Resolved paths are deduplicated and absolutised before being handed to `FileScan
 
 ---
 
+## Managing folders from the terminal
+
+Folders can be registered three ways: the `SKILLFORGE_FOLDERS` env var, the `skills__configure` MCP tool (from inside an LLM session), and the `skillforge folders` CLI subcommand (from the shell). All three persist to the same config file.
+
+```bash
+skillforge folders list [--json]                 # print registered folders
+skillforge folders add <path> [flags]            # register a folder
+skillforge folders remove <path>                 # remove a folder entry
+skillforge folders reset --yes                   # reset folders to the default (empty) list
+```
+
+`add` flags:
+
+- `--priority <n>` — folder priority (default `100`; higher wins on name collisions).
+- `--tags <a,b,c>` — comma-separated tags.
+- `--disabled` — register the folder disabled.
+
+`reset` requires `--yes` to apply — without it, the command prints what would change and makes no edits. The `folders` subcommand exposes the same `ConfigStore` folder operations as the `skills__configure` MCP tool, so use whichever surface fits your workflow.
+
+### Skill-source conflict detection
+
+When you register a folder that already lives inside another tool's native skill store, `skillforge folders add` prints a hint to disable the duplicate — otherwise the same skills load twice and skill names collide. Two stores are detected:
+
+- A Claude Code plugin cache (`~/.claude/plugins/cache/...`) → hint suggests `/plugin` to disable the duplicate plugin.
+- A Gemini CLI extension (`~/.gemini/extensions/...`) → hint suggests `/extensions disable <name>`.
+
+The `skills__configure` MCP tool surfaces the same detection: an `add_folder` action that triggers a conflict returns a `conflictHint` field alongside the normal response. The hint is informational only — SkillForge never edits another tool's config and the conflict does not block the folder from being added.
+
+---
+
 ## Schema (annotated)
 
 The full Zod schema lives in `src/config/config-schema.ts`. Below is the camelCase canonical form with every field's default and constraint.
@@ -176,6 +206,7 @@ Read-only. Same response shape as every other action.
 - Path is normalised via `path.resolve()` and compared as absolute.
 - Idempotent — adding an already-present folder is a no-op but still saves the file (atomic-write contract: simpler to always save than to branch).
 - Defaults applied: `priority: 100`, `enabled: true`, `tags: []`. Edit the JSON file directly if you need a different priority.
+- If the folder is inside another tool's native skill store (a Claude Code plugin cache or a Gemini CLI extension), the response carries an extra `conflictHint` string — informational only, the folder is still added. See [Skill-source conflict detection](#skill-source-conflict-detection).
 
 ### `remove_folder`
 

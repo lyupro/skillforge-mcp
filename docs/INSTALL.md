@@ -9,15 +9,31 @@ This guide covers wiring SkillForge MCP into the four supported integrations:
 
 For per-tool deep dives, see [INTEGRATION/](./INTEGRATION/).
 
-## Install CLI (v1.1)
+## Install CLI
 
-Starting with v1.1, `skillforge install` edits each host tool's config file for you:
+`skillforge install` edits each host tool's config file for you:
 
 ```bash
 npx @lyupro/skillforge-mcp install --all
 ```
 
 It supports `--claude` / `--codex` / `--cursor` / `--all`, plus `--dry-run`, `--uninstall`, `--force`, and `--entry npx|local`. Writes are atomic and snapshot the previous content into `<path>.backup`. Full reference: [INSTALL_CLI.md](./INSTALL_CLI.md).
+
+### Global vs project scope
+
+By default the installer edits each host's **global** config (the home-directory file). Pass `--scope project` to wire SkillForge into a **repo-local** config rooted at the current directory instead:
+
+```bash
+npx @lyupro/skillforge-mcp install --all --scope project
+```
+
+| Host | `--scope global` (default) | `--scope project` |
+|------|----------------------------|-------------------|
+| Claude Code | `~/.claude.json` | `./.mcp.json` |
+| Codex CLI | `~/.codex/config.toml` | `./.codex/config.toml` |
+| Cursor | Cursor's `settings.json` | `./.cursor/mcp.json` |
+
+`skillforge uninstall` accepts the same `--scope global|project` flag — pass the scope you installed with so the right config file is reverted.
 
 The manual wiring sections below remain the canonical reference for users who prefer to edit configs by hand or for environments where `npx` cannot run.
 
@@ -58,6 +74,23 @@ realpath dist/server.js
 ---
 
 ## 1. Claude Code
+
+### As a Claude Code plugin (recommended)
+
+SkillForge ships a Claude Code plugin manifest, so it installs through the native `/plugins` UI with a rich plugin card:
+
+```bash
+/plugin marketplace add lyupro/skillforge-mcp
+/plugin install skillforge
+```
+
+Or install it directly:
+
+```bash
+claude plugin install skillforge@lyupro/skillforge-mcp
+```
+
+### As an MCP server
 
 ```bash
 claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js

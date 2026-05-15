@@ -2,7 +2,30 @@
 
 Claude Code is the primary integration target — SkillForge ships with `claude` as the first-class wiring command.
 
-## Install (local-clone, pre-npm-publish)
+## Install as a Claude Code plugin (recommended)
+
+SkillForge ships a Claude Code plugin manifest (`.claude-plugin/plugin.json`), so it installs through the native `/plugins` UI with a rich plugin card — no manual MCP wiring:
+
+```bash
+/plugin marketplace add lyupro/skillforge-mcp
+/plugin install skillforge
+```
+
+Or install it directly:
+
+```bash
+claude plugin install skillforge@lyupro/skillforge-mcp
+```
+
+The plugin manifest declares the bundled `skillforge` MCP server, so the five `skills__*` tools register automatically after a session restart.
+
+## Install as an MCP server
+
+```bash
+claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
+```
+
+## Install from a local clone
 
 ```bash
 git clone https://github.com/lyupro/skillforge-mcp.git
@@ -18,12 +41,6 @@ $(Get-Item dist/server.js).FullName                        # Windows PowerShell
 
 ```bash
 claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js
-```
-
-After publication on npm:
-
-```bash
-claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
 ```
 
 ## Verify
