@@ -9,18 +9,19 @@ Verify all three manifests agree on the release version.
 ```bash
 node -e "
 const p = require('./package.json');
-const pl = require('./plugin.json');
+const pl = require('./.claude-plugin/plugin.json');
+const mk = require('./.claude-plugin/marketplace.json');
 const m = require('./manifest.json');
-console.log({package: p.version, plugin: pl.version, manifest: m.version});
+console.log({package: p.version, plugin: pl.version, manifest: m.version, marketplacePlugin: mk.plugins[0].version});
 "
 ```
 
-All three values must match the tag you are about to cut.
+All four values must match the tag you are about to cut.
 
 ## 2. Full verification
 
 ```bash
-pnpm test         # 370 + 1 win32-skip
+pnpm test         # 532 passing + 1 win32-skip
 pnpm lint         # tsc --noEmit
 pnpm check:size   # all source files ≤ 400 lines
 pnpm build        # tsc -p tsconfig.json — produces dist/
@@ -42,13 +43,14 @@ Expected root entries in the tarball:
 - `README.md`
 - `manifest.json`
 - `package.json`
-- `dist/**` — TypeScript build output (≈ 190 files)
+- `.claude-plugin/**` — `plugin.json` + `marketplace.json` (Claude Code plugin manifests)
+- `dist/**` — TypeScript build output
 
-Expected tarball size: ≈ 60 KB compressed, ≈ 230 KB unpacked. If the size jumps drastically, inspect `package.json#files` for accidental inclusion.
+If the tarball size jumps drastically, inspect `package.json#files` for accidental inclusion.
 
-Notes on intentional exclusions:
+Notes:
 
-- **`plugin.json`** lives at the GitHub repository root for the marketplace catalog; it is not consumed at runtime and ships only via the marketplace listing, not the npm tarball.
+- **`.claude-plugin/`** ships in the npm tarball (it is listed in `package.json#files`) so the package is installable as a Claude Code plugin directly from npm — `plugin.json` is the plugin manifest, `marketplace.json` is the marketplace catalog.
 - **`RELEASE_NOTES.md`** is the GitHub Release body; CHANGELOG.md is the canonical machine-readable changelog inside the package.
 - **`docs/`, `examples/`, `skills/`, `marketing/`, `scripts/`, `src/`, `tests/`** are not in `package.json#files`; npm consumers receive only the built artifacts.
 
@@ -87,16 +89,12 @@ git push origin v1.0.0
 
 On GitHub, create a Release from the tag and paste the body of `RELEASE_NOTES.md`. Attach `lyupro-skillforge-mcp-<version>.tgz` produced by `npm pack` if you want a release artifact bound to the source tag.
 
-## 7. Update marketplace catalog
+## 7. Marketplace catalog
 
-In the sibling [`llm-plugins-marketplace`](https://github.com/lyupro/llm-plugins-marketplace) repository, bump `plugins[0].version` to the new value, commit, and push.
+The marketplace catalog is `.claude-plugin/marketplace.json` inside this repo — there is no separate marketplace repository. Its `plugins[0].version` is bumped as part of the version sync in step 1, so no extra action is needed here. Confirm it matches:
 
 ```bash
-cd ../llm-plugins-marketplace
-# edit marketplace.json — bump skillforge-mcp version
-git add marketplace.json
-git commit -m "feat(skillforge-mcp): bump to v<version>"
-git push
+node -e "console.log(require('./.claude-plugin/marketplace.json').plugins[0].version)"
 ```
 
 ## 8. Smoke against the published package
@@ -121,7 +119,7 @@ npm deprecate "@lyupro/skillforge-mcp@<bad-version>" "Deprecated due to <reason>
 
 ## 10. Post-release checklist
 
-- [ ] All three manifest files match the published version.
+- [ ] All four manifests (`package.json`, `manifest.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`) match the published version.
 - [ ] CHANGELOG.md has the new version section.
 - [ ] GitHub Release published with `RELEASE_NOTES.md` body.
 - [ ] Marketplace catalog `plugins[0].version` updated.
