@@ -16,7 +16,7 @@ npx @lyupro/skillforge-mcp install [flags]
 |------|---------|
 | `--claude` | Edit `~/.claude.json` |
 | `--codex` | Edit `~/.codex/config.toml` |
-| `--cursor` | Edit Cursor's `settings.json` (OS-specific path — see below) |
+| `--cursor` | Edit `~/.cursor/mcp.json` |
 | `--all` | Auto-detect installed hosts (binary on PATH or config file present) and install into every detected one |
 | `--dry-run` | Print the exact `before` and `after` content per host. No disk writes. |
 | `--uninstall` | Reverse a previous install — remove the `skillforge` entry, leave everything else untouched |
@@ -77,28 +77,24 @@ args = ["-y", "@lyupro/skillforge-mcp"]
 
 Other tables stay untouched.
 
-### Cursor — `settings.json`
+### Cursor — `~/.cursor/mcp.json`
 
-OS-specific path:
-
-- Windows: `%APPDATA%\Cursor\User\settings.json`
-- macOS: `~/Library/Application Support/Cursor/User/settings.json`
-- Linux: `~/.config/Cursor/User/settings.json`
+Cursor reads MCP servers from `~/.cursor/mcp.json` (global) — uniform across Windows, macOS, and Linux. With `--scope project` the target is `<project>/.cursor/mcp.json` instead. Cursor does **not** read MCP servers from its `settings.json`.
 
 ```json
 {
-  "mcp": {
-    "servers": {
-      "skillforge": {
-        "command": "npx",
-        "args": ["-y", "@lyupro/skillforge-mcp"]
-      }
+  "mcpServers": {
+    "skillforge": {
+      "command": "npx",
+      "args": ["-y", "@lyupro/skillforge-mcp"]
     }
   }
 }
 ```
 
-Existing editor and workspace settings are preserved.
+> **Not VS Code.** VS Code declares MCP servers via a nested `mcp.servers` block inside its `settings.json`; Cursor uses a standalone `mcp.json` with a top-level `mcpServers` map. The installer writes the Cursor shape — see [INTEGRATION/cursor.md](./INTEGRATION/cursor.md).
+
+Other entries under `mcpServers` and any unrelated top-level keys are preserved.
 
 ## Uninstalling
 
@@ -109,7 +105,7 @@ npx @lyupro/skillforge-mcp install --all --uninstall
 npx @lyupro/skillforge-mcp install --claude --uninstall
 ```
 
-The host's config file remains in place. If `skillforge` was the only MCP server entry, the surrounding `mcpServers` / `mcp_servers` / `mcp.servers` object stays as an empty container.
+The host's config file remains in place. If `skillforge` was the only MCP server entry, the surrounding `mcpServers` (Claude Code / Cursor) or `mcp_servers` (Codex CLI) object stays as an empty container.
 
 ## Backup and recovery
 
@@ -122,8 +118,8 @@ mv ~/.claude.json.backup ~/.claude.json
 # Codex CLI
 mv ~/.codex/config.toml.backup ~/.codex/config.toml
 
-# Cursor (Linux example — same idea on macOS / Windows under the OS-specific path)
-mv ~/.config/Cursor/User/settings.json.backup ~/.config/Cursor/User/settings.json
+# Cursor
+mv ~/.cursor/mcp.json.backup ~/.cursor/mcp.json
 ```
 
 The CLI never deletes `.backup` files on its own — clean them up when you no longer need them.

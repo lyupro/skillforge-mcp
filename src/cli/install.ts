@@ -54,7 +54,7 @@ Usage:
 Targets (at least one required, unless --help):
   --claude            Edit ~/.claude.json
   --codex             Edit ~/.codex/config.toml
-  --cursor            Edit Cursor's settings.json (OS-specific path)
+  --cursor            Edit ~/.cursor/mcp.json
   --all               Auto-detect installed hosts and install into each
 
 Modes:
@@ -71,7 +71,7 @@ Scope:
   --scope global      (default) edit the host's home-directory config:
                         claude → ~/.claude.json
                         codex  → ~/.codex/config.toml
-                        cursor → Cursor's settings.json
+                        cursor → ~/.cursor/mcp.json
   --scope project     edit a repo-local config rooted at the current directory:
                         claude → ./.mcp.json
                         codex  → ./.codex/config.toml

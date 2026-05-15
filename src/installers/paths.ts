@@ -1,21 +1,20 @@
 /**
- * OS-specific config path helpers for host tools.
+ * Config path helpers for host tools.
  *
  * Per repo convention, all SkillForge config paths use `os.homedir()`
- * exclusively — no platform branching. Cursor is the exception: its
- * `settings.json` location is third-party (Cursor app), out of our
- * control, so the platform-specific dispatch here is rubric-exempt.
+ * exclusively — no platform branching. Every host (Claude Code, Codex CLI,
+ * Cursor) stores its MCP config in a homedir-rooted file uniform across OSes.
  */
 
 import { join, resolve } from 'node:path';
-import { homedir, platform } from 'node:os';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { statSync } from 'node:fs';
 
 export interface PathOverrides {
   claudeConfigPath: string;
   codexConfigPath: string;
-  cursorSettingsPath: string;
+  cursorConfigPath: string;
   defaultBinaryPath: string;
 }
 
@@ -36,20 +35,12 @@ export function codexConfigPath(): string {
   return join(homedir(), '.codex', 'config.toml');
 }
 
-// Cursor stores its global settings.json in a per-OS application data
-// directory. We follow the location documented by the Cursor app itself.
-// This is the only place in the codebase where a platform branch is
-// permitted, because the third-party host owns the path.
-export function cursorSettingsPath(): string {
-  const os = platform();
-  if (os === 'win32') {
-    const appData = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming');
-    return join(appData, 'Cursor', 'User', 'settings.json');
-  }
-  if (os === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'Cursor', 'User', 'settings.json');
-  }
-  return join(homedir(), '.config', 'Cursor', 'User', 'settings.json');
+// Cursor reads its global MCP server registry from ~/.cursor/mcp.json on
+// every OS — the same top-level `mcpServers` shape as ~/.claude.json. This
+// is distinct from Cursor's VS Code-style `settings.json`, which Cursor
+// does NOT read MCP servers from.
+export function cursorConfigPath(): string {
+  return join(homedir(), '.cursor', 'mcp.json');
 }
 
 // Fallback `--entry local` target when --binary-path is not supplied.
@@ -66,7 +57,7 @@ export function defaultPaths(): PathOverrides {
   return {
     claudeConfigPath: claudeConfigPath(),
     codexConfigPath: codexConfigPath(),
-    cursorSettingsPath: cursorSettingsPath(),
+    cursorConfigPath: cursorConfigPath(),
     defaultBinaryPath: defaultBinaryPath(),
   };
 }
@@ -90,9 +81,9 @@ export function codexProjectConfigPath(projectRoot: string): string {
   return join(projectRoot, '.codex', 'config.toml');
 }
 
-// Cursor reads project-local MCP servers from `.cursor/mcp.json`. We keep the
-// same `mcp.servers` JSON shape used by the global Cursor installer so the
-// existing merge logic is reused verbatim.
+// Cursor reads project-local MCP servers from `.cursor/mcp.json`, the same
+// top-level `mcpServers` JSON shape as the global `~/.cursor/mcp.json`, so
+// the existing merge logic is reused verbatim.
 export function cursorProjectConfigPath(projectRoot: string): string {
   return join(projectRoot, '.cursor', 'mcp.json');
 }
@@ -132,7 +123,7 @@ export function resolveConfigPath(
   if (scope === 'global') {
     if (host === 'claude') return claudeConfigPath();
     if (host === 'codex') return codexConfigPath();
-    return cursorSettingsPath();
+    return cursorConfigPath();
   }
   assertProjectRoot(projectRoot);
   if (host === 'claude') return claudeProjectConfigPath(projectRoot);

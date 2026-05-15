@@ -31,7 +31,7 @@ npx @lyupro/skillforge-mcp install --all --scope project
 |------|----------------------------|-------------------|
 | Claude Code | `~/.claude.json` | `./.mcp.json` |
 | Codex CLI | `~/.codex/config.toml` | `./.codex/config.toml` |
-| Cursor | Cursor's `settings.json` | `./.cursor/mcp.json` |
+| Cursor | `~/.cursor/mcp.json` | `./.cursor/mcp.json` |
 
 `skillforge uninstall` accepts the same `--scope global|project` flag — pass the scope you installed with so the right config file is reverted.
 
@@ -139,21 +139,21 @@ References:
 
 ## 3. Cursor
 
-Cursor's MCP support has been verified manually. The expected wiring once Cursor's MCP API stabilizes:
+Cursor reads MCP servers from `~/.cursor/mcp.json` (global) or `<project>/.cursor/mcp.json` (project) — the same top-level `mcpServers` shape Claude Code uses. Cursor does **not** read MCP servers from its `settings.json`.
 
 ```json
-// Cursor settings.json (path depends on platform — see Cursor docs)
+// ~/.cursor/mcp.json (global) — or <project>/.cursor/mcp.json (project)
 {
-  "mcp": {
-    "servers": {
-      "skillforge": {
-        "command": "node",
-        "args": ["/absolute/path/to/skillforge-mcp/dist/server.js"]
-      }
+  "mcpServers": {
+    "skillforge": {
+      "command": "node",
+      "args": ["/absolute/path/to/skillforge-mcp/dist/server.js"]
     }
   }
 }
 ```
+
+> **Not VS Code.** VS Code uses a nested `mcp.servers` block inside its `settings.json`; Cursor uses a standalone `mcp.json` with a top-level `mcpServers` map. The two are not interchangeable — see [INTEGRATION/cursor.md](./INTEGRATION/cursor.md).
 
 For the latest Cursor-specific notes, see [INTEGRATION/cursor.md](./INTEGRATION/cursor.md).
 

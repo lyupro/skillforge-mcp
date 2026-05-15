@@ -1,19 +1,18 @@
 /**
- * Cursor installer — edits Cursor's settings.json mcp.servers.skillforge.
+ * Cursor installer — edits Cursor's mcp.json `mcpServers.skillforge`.
  *
- * Cursor stores its global settings JSON at an OS-specific path:
- *   Windows: %APPDATA%/Cursor/User/settings.json
- *   macOS:   ~/Library/Application Support/Cursor/User/settings.json
- *   Linux:   ~/.config/Cursor/User/settings.json
+ * Cursor reads MCP servers from `~/.cursor/mcp.json` (global) and
+ * `<project>/.cursor/mcp.json` (project) — uniform across all OSes. It
+ * does NOT read MCP servers from Cursor's VS Code-style `settings.json`.
  *
- * The MCP server registry lives under `mcp.servers.<name>` with the same
- * { command, args, env? } shape used by Claude Code.
+ * The MCP server registry lives under the top-level `mcpServers.<name>`
+ * key with the same { command, args, env? } shape used by Claude Code.
  */
 
 import { spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { readJsonSafe, writeJsonAtomic } from './atomic-write.js';
-import { cursorSettingsPath, defaultBinaryPath } from './paths.js';
+import { cursorConfigPath, defaultBinaryPath } from './paths.js';
 import type {
   Installer,
   InstallOptions,
@@ -37,8 +36,8 @@ interface ServerEntry {
   env?: Record<string, string>;
 }
 
-interface CursorSettings {
-  mcp?: { servers?: Record<string, ServerEntry> };
+interface CursorConfig {
+  mcpServers?: Record<string, ServerEntry>;
   [key: string]: unknown;
 }
 
@@ -67,24 +66,20 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-function readSkillforge(cfg: CursorSettings): ServerEntry | undefined {
-  return cfg.mcp?.servers?.[SKILL_KEY];
+function readSkillforge(cfg: CursorConfig): ServerEntry | undefined {
+  return cfg.mcpServers?.[SKILL_KEY];
 }
 
-function mergeInstall(existing: CursorSettings, entry: ServerEntry): CursorSettings {
-  const mcp = existing.mcp ?? {};
-  const servers = mcp.servers ?? {};
-  return {
-    ...existing,
-    mcp: { ...mcp, servers: { ...servers, [SKILL_KEY]: entry } },
-  };
+function mergeInstall(existing: CursorConfig, entry: ServerEntry): CursorConfig {
+  const servers = existing.mcpServers ?? {};
+  return { ...existing, mcpServers: { ...servers, [SKILL_KEY]: entry } };
 }
 
-function mergeUninstall(existing: CursorSettings): CursorSettings {
-  const mcp = existing.mcp;
-  if (mcp === undefined || mcp.servers === undefined) return existing;
-  const { [SKILL_KEY]: _drop, ...rest } = mcp.servers;
-  return { ...existing, mcp: { ...mcp, servers: rest } };
+function mergeUninstall(existing: CursorConfig): CursorConfig {
+  const servers = existing.mcpServers;
+  if (servers === undefined) return existing;
+  const { [SKILL_KEY]: _drop, ...rest } = servers;
+  return { ...existing, mcpServers: rest };
 }
 
 export class CursorInstaller implements Installer {
@@ -94,7 +89,7 @@ export class CursorInstaller implements Installer {
   readonly #probe: () => boolean;
 
   constructor(overrides: CursorInstallerPathOverrides = {}) {
-    this.#configPath = overrides.configPath ?? cursorSettingsPath();
+    this.#configPath = overrides.configPath ?? cursorConfigPath();
     this.#binaryFallback = overrides.binaryPath ?? defaultBinaryPath();
     this.#probe = overrides.binaryProbe ?? probeCursorBinary;
   }
@@ -105,7 +100,7 @@ export class CursorInstaller implements Installer {
   }
 
   async install(opts: InstallOptions): Promise<InstallResult> {
-    const existing = ((await readJsonSafe(this.#configPath)) as CursorSettings | null) ?? {};
+    const existing = ((await readJsonSafe(this.#configPath)) as CursorConfig | null) ?? {};
     const entry = buildEntry(opts, this.#binaryFallback);
     const prior = readSkillforge(existing);
 
@@ -128,7 +123,7 @@ export class CursorInstaller implements Installer {
   }
 
   async uninstall(): Promise<UninstallResult> {
-    const existing = (await readJsonSafe(this.#configPath)) as CursorSettings | null;
+    const existing = (await readJsonSafe(this.#configPath)) as CursorConfig | null;
     if (existing === null || readSkillforge(existing) === undefined) {
       return { tool: this.name, status: 'not-installed', configPath: this.#configPath };
     }
@@ -138,10 +133,10 @@ export class CursorInstaller implements Installer {
   }
 
   async preview(opts: InstallOptions & { action: 'install' | 'uninstall' }): Promise<PreviewResult> {
-    const existing = (await readJsonSafe(this.#configPath)) as CursorSettings | null;
+    const existing = (await readJsonSafe(this.#configPath)) as CursorConfig | null;
     const before = existing === null ? null : JSON.stringify(existing, null, 2);
 
-    let nextValue: CursorSettings;
+    let nextValue: CursorConfig;
     if (opts.action === 'install') {
       const base = existing ?? {};
       const entry = buildEntry(opts, this.#binaryFallback);
