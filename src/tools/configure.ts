@@ -5,6 +5,10 @@ import type { PersistedConfig } from '../config/index.js';
 import { defaultConfig } from '../config/index.js';
 import { loadResolvedConfig } from '../config.js';
 import { ensureRegistryFresh } from './loader.js';
+import {
+  detectSkillSourceConflict,
+  formatConflictHint,
+} from '../detect/skill-source-conflict.js';
 
 export const configureInputSchema = {
   action: z.enum([
@@ -34,6 +38,12 @@ export interface ConfigureResult {
   blacklist: string[];
   /** Skills visible in the registry after the action took effect. */
   totalSkills: number;
+  /**
+   * Set by `add_folder` only, when the added folder is also served by a host
+   * CLI's native plugin/extension system (skills would load twice). It is an
+   * informational hint — the folder is still registered. Absent otherwise.
+   */
+  conflictHint?: string;
 }
 
 /** Recompute resolved folders from env + persisted config, then splice deps.folders in place. */
@@ -94,10 +104,12 @@ export async function handleConfigure(
       // Why: always save even on no-op — simpler than branching, atomic write is cheap.
       await deps.configStore.save(persisted);
       const finalPersisted = await reconcileFolders(deps);
+      const conflict = detectSkillSourceConflict(absPath);
       return {
         folders: [...deps.folders],
         blacklist: finalPersisted.blacklist,
         totalSkills: deps.registry.size,
+        ...(conflict !== null ? { conflictHint: formatConflictHint(conflict) } : {}),
       };
     }
 

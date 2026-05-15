@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readFile, access } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { main } from './folders.js';
 
@@ -51,6 +51,39 @@ describe('folders.main', () => {
       const config = await readConfig();
       expect(config.folders).toHaveLength(1);
       expect(config.folders[0]!.path).toBe(skillDir);
+    });
+
+    it('prints a skill-source conflict hint but still registers (exit 0)', async () => {
+      // A folder inside the real Claude plugin cache root. The conflict
+      // detector is pure path logic (reads no files), and isDirectory is
+      // stubbed, so no directory is actually created under the user's home.
+      const pluginCachePath = join(
+        homedir(),
+        '.claude',
+        'plugins',
+        'cache',
+        'some-marketplace',
+        'some-plugin',
+        '9.9.9',
+        'skills',
+      );
+      const code = await main(['add', pluginCachePath], {
+        ...deps(),
+        isDirectory: async () => true,
+      });
+      expect(code).toBe(0);
+      expect(out).toContain('Registered folder');
+      expect(out).toContain('also loaded by the Claude Code plugin');
+      expect(out).toContain('some-marketplace/some-plugin');
+      const config = await readConfig();
+      expect(config.folders).toHaveLength(1);
+    });
+
+    it('prints no conflict hint for an ordinary folder', async () => {
+      const code = await main(['add', skillDir], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('Registered folder');
+      expect(out).not.toContain('also loaded by');
     });
 
     it('applies --priority, --tags and --disabled flags', async () => {

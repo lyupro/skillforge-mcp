@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { homedir } from 'node:os';
 import { handleConfigure } from './configure.js';
 import { SkillRegistry } from '../core/skill-registry.js';
 import { SkillResolver } from '../core/skill-resolver.js';
@@ -166,6 +167,27 @@ describe('handleConfigure — add_folder', () => {
     await expect(handleConfigure(deps, { action: 'add_folder', folder: '   ' })).rejects.toThrow(
       'folder path must not be empty',
     );
+  });
+
+  it('returns conflictHint when the folder is inside a host native skill store', async () => {
+    const { store } = makeFakeStore();
+    const deps = makeDeps({ store, folders: [] });
+    // A path inside the real Gemini extensions root. Detection is pure path
+    // logic and reads no files, so nothing is created on disk.
+    const extPath = join(homedir(), '.gemini', 'extensions', 'fixture-ext', 'skills');
+    const result = await handleConfigure(deps, { action: 'add_folder', folder: extPath });
+    expect(result.conflictHint).toBeDefined();
+    expect(result.conflictHint).toContain('Gemini CLI extension');
+    expect(result.conflictHint).toContain('/extensions disable fixture-ext');
+    // Folder is still registered despite the conflict.
+    expect(result.folders).toContain(resolve(extPath));
+  });
+
+  it('omits conflictHint for an ordinary folder', async () => {
+    const { store } = makeFakeStore();
+    const deps = makeDeps({ store, folders: [] });
+    const result = await handleConfigure(deps, { action: 'add_folder', folder: '/plain/path' });
+    expect(result.conflictHint).toBeUndefined();
   });
 });
 

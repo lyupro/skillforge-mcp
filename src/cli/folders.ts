@@ -24,6 +24,10 @@ import { stat } from 'node:fs/promises';
 import { ConfigStore, defaultConfigPath } from '../config/config-store.js';
 import { defaultConfig } from '../config/config-schema.js';
 import type { FolderEntry } from '../config/config-schema.js';
+import {
+  detectSkillSourceConflict,
+  formatConflictHint,
+} from '../detect/skill-source-conflict.js';
 
 export interface FoldersDeps {
   stdout?: (text: string) => void;
@@ -188,6 +192,11 @@ async function handleAdd(
   config.folders.push(entry);
   await store.save(config);
   stdout(`Registered folder: ${absPath}\n`);
+  // Informational only: a conflict does not block the add or change the exit code.
+  const conflict = detectSkillSourceConflict(absPath);
+  if (conflict !== null) {
+    stdout(`${formatConflictHint(conflict)}\n`);
+  }
   return 0;
 }
 
