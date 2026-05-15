@@ -26,6 +26,7 @@
 
 import { main as installMain } from './install.js';
 import { main as toolsMain } from './tools.js';
+import { main as foldersMain } from './folders.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
 
@@ -43,6 +44,9 @@ Commands:
   tools        List the 5 MCP tools the server exposes (params + examples).
                Pass --json for machine-readable output.
                  Example: skillforge-mcp tools --json
+  folders      Manage skill folders from the terminal (list/add/remove/reset).
+               Run "skillforge-mcp folders" for sub-action usage.
+                 Example: skillforge-mcp folders add ~/.lyupro/skills
 
 Options:
   --help, -h   Show this message.
@@ -123,6 +127,9 @@ export async function main(
   }
   if (first === 'tools') {
     return toolsMain(rawArgv.slice(1));
+  }
+  if (first === 'folders') {
+    return foldersMain(rawArgv.slice(1));
   }
   if (first === 'serve' || first === undefined) {
     const start = overrides.startServe ?? defaultStartServe;

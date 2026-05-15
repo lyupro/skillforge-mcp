@@ -118,6 +118,14 @@ describe('dispatcher.main', () => {
     });
   });
 
+  describe('folders subcommand', () => {
+    it('routes to the folders handler and returns its exit code', async () => {
+      const code = await main(['folders']);
+      expect(code).toBe(2);
+      expect(errors.join('')).toContain('skillforge folders');
+    });
+  });
+
   describe('unknown command', () => {
     it('returns exit code 2 and writes error', async () => {
       const code = await main(['weeble']);
