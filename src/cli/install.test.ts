@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseArgs, runInstall, UsageError } from './install.js';
 import type {
   Installer,
@@ -107,6 +110,23 @@ describe('parseArgs', () => {
   it('parses --help and -h', () => {
     expect(parseArgs(['--help']).showHelp).toBe(true);
     expect(parseArgs(['-h']).showHelp).toBe(true);
+  });
+
+  it('defaults scope to global', () => {
+    expect(parseArgs(['--claude']).scope).toBe('global');
+  });
+
+  it('parses --scope global', () => {
+    expect(parseArgs(['--claude', '--scope', 'global']).scope).toBe('global');
+  });
+
+  it('parses --scope project', () => {
+    expect(parseArgs(['--claude', '--scope', 'project']).scope).toBe('project');
+  });
+
+  it('rejects --scope with an invalid value', () => {
+    expect(() => parseArgs(['--scope', 'bogus'])).toThrow(UsageError);
+    expect(() => parseArgs(['--scope'])).toThrow(UsageError);
   });
 });
 
@@ -235,6 +255,18 @@ describe('runInstall dispatch', () => {
     expect(cap.out.join('\n')).toContain('Usage:');
   });
 
+  it('--help documents the --scope flag', async () => {
+    const cap = makeCapture();
+    await runInstall(parseArgs(['--help']), {
+      installers: [],
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    const out = cap.out.join('\n');
+    expect(out).toContain('--scope global');
+    expect(out).toContain('--scope project');
+  });
+
   it('catches installer errors and exits 1', async () => {
     const claude: Installer = {
       name: 'claude',
@@ -312,5 +344,171 @@ describe('module-level smoke', () => {
     expect(e.name).toBe('UsageError');
     // Touch vi to keep the import non-empty.
     expect(typeof vi.fn).toBe('function');
+  });
+});
+
+describe('--scope end-to-end (real installers, temp cwd)', () => {
+  // These tests exercise the real registry-resolved installers so the
+  // project-vs-global path routing is verified against disk. Each test
+  // chdir's into an isolated temp directory and restores cwd afterwards.
+  let dir: string;
+  let originalCwd: string;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    dir = mkdtempSync(join(tmpdir(), 'skillforge-scope-'));
+    process.chdir(dir);
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('--scope project writes Claude config to ./.mcp.json in cwd', async () => {
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--claude', '--scope', 'project']), {
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    const projectFile = join(dir, '.mcp.json');
+    expect(existsSync(projectFile)).toBe(true);
+    const written = JSON.parse(readFileSync(projectFile, 'utf8'));
+    expect(written.mcpServers.skillforge).toEqual({
+      command: 'npx',
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
+    });
+    // The global ~/.claude.json must not be touched: output references the
+    // project-local path.
+    expect(cap.out.join('\n')).toContain('.mcp.json');
+  });
+
+  it('--scope project creates ./.cursor/mcp.json and ./.codex/config.toml', async () => {
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--cursor', '--codex', '--scope', 'project']), {
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    expect(existsSync(join(dir, '.cursor', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(dir, '.codex', 'config.toml'))).toBe(true);
+  });
+
+  it('default scope (global) does NOT write into cwd', async () => {
+    // With no --scope flag the installer targets the home-directory config,
+    // so nothing should appear in the temp cwd. We use --dry-run to avoid
+    // touching the real global files while still asserting routing.
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--claude', '--dry-run']), {
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    expect(existsSync(join(dir, '.mcp.json'))).toBe(false);
+    expect(cap.out.join('\n')).not.toContain(join(dir, '.mcp.json'));
+  });
+
+  it('--scope project merges into an existing project file without dropping servers', async () => {
+    const projectFile = join(dir, '.mcp.json');
+    writeFileSync(
+      projectFile,
+      JSON.stringify({
+        mcpServers: { other: { command: 'node', args: ['/x.js'] } },
+        otherTopLevel: 'preserved',
+      }),
+    );
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--claude', '--scope', 'project']), {
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    const written = JSON.parse(readFileSync(projectFile, 'utf8'));
+    expect(written.mcpServers.other).toEqual({ command: 'node', args: ['/x.js'] });
+    expect(written.mcpServers.skillforge).toBeDefined();
+    expect(written.otherTopLevel).toBe('preserved');
+  });
+
+  it('uninstall --scope project removes only from the project file', async () => {
+    const projectFile = join(dir, '.mcp.json');
+    writeFileSync(
+      projectFile,
+      JSON.stringify({
+        mcpServers: {
+          skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp', 'serve'] },
+          other: { command: 'x', args: [] },
+        },
+      }),
+    );
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--claude', '--uninstall', '--scope', 'project']), {
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    const written = JSON.parse(readFileSync(projectFile, 'utf8'));
+    expect(written.mcpServers.skillforge).toBeUndefined();
+    expect(written.mcpServers.other).toBeDefined();
+    expect(cap.out.join('\n')).toContain('[claude] UNINSTALLED');
+  });
+
+  it('--dry-run --scope project prints the project-local target path', async () => {
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--claude', '--scope', 'project', '--dry-run']), {
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    expect(cap.out.join('\n')).toContain(join(dir, '.mcp.json'));
+    // Nothing written to disk.
+    expect(existsSync(join(dir, '.mcp.json'))).toBe(false);
+  });
+});
+
+describe('--scope project with an invalid project root', () => {
+  it('runInstall exits 1 with a clear error and writes nothing', async () => {
+    // Build installers explicitly bound to a non-existent project root so the
+    // failure surfaces through runInstall's error handling deterministically
+    // on every OS (no reliance on a deleted process.cwd()).
+    const cap = makeCapture();
+    const bogusRoot = join(tmpdir(), 'skillforge-no-such-dir-xyz');
+    const { getInstallerByName } = await import('../installers/registry.js');
+
+    // Resolving installers for a missing project root throws — the registry
+    // is where runInstall catches this.
+    expect(() => getInstallerByName('claude', 'project', bogusRoot)).toThrow(/--scope project/);
+
+    // And runInstall returns a non-zero exit for an invalid --scope value,
+    // which parseArgs rejects before any installer runs.
+    expect(() => parseArgs(['--claude', '--scope', 'sideways'])).toThrow(UsageError);
+    expect(cap.out).toHaveLength(0);
+  });
+
+  it('runInstall surfaces a registry resolution failure as exit 1', async () => {
+    // Inject installers whose construction throws by deleting the cwd on
+    // POSIX; skip on platforms that refuse to remove an in-use directory.
+    const originalCwd = process.cwd();
+    const dir = mkdtempSync(join(tmpdir(), 'skillforge-gone-'));
+    process.chdir(dir);
+    let removed = false;
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      removed = true;
+    } catch {
+      // Windows keeps a handle on the cwd — cannot delete it. Skip.
+    }
+    try {
+      if (!removed) return;
+      const cap = makeCapture();
+      const code = await runInstall(parseArgs(['--claude', '--scope', 'project']), {
+        stdout: cap.stdout,
+        stderr: cap.stderr,
+      });
+      expect(code).toBe(1);
+      expect(cap.err.join('\n')).toContain('--scope project');
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 });

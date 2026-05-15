@@ -24,4 +24,27 @@ describe('getInstallerByName', () => {
     expect(getInstallerByName('codex').name).toBe('codex');
     expect(getInstallerByName('cursor').name).toBe('cursor');
   });
+
+  it('defaults to global scope when no scope is given', () => {
+    // No throw — global scope needs no project root validation.
+    expect(getInstallerByName('claude').name).toBe('claude');
+  });
+
+  it('accepts an explicit project scope with a valid root', () => {
+    expect(getInstallerByName('claude', 'project', process.cwd()).name).toBe('claude');
+  });
+});
+
+describe('getAllInstallers with scope', () => {
+  it('global scope returns three installers', () => {
+    expect(getAllInstallers('global').map((i) => i.name)).toEqual([
+      'claude',
+      'codex',
+      'cursor',
+    ]);
+  });
+
+  it('project scope returns three installers for a valid root', () => {
+    expect(getAllInstallers('project', process.cwd())).toHaveLength(3);
+  });
 });

@@ -16,6 +16,7 @@
  */
 
 import { getAllInstallers, getInstallerByName } from '../installers/registry.js';
+import type { Scope } from '../installers/paths.js';
 import type {
   Installer,
   InstallOptions,
@@ -34,6 +35,7 @@ export interface ParsedArgs {
   force: boolean;
   entry: 'npx' | 'local';
   binaryPath?: string;
+  scope: Scope;
   showHelp: boolean;
 }
 
@@ -65,6 +67,16 @@ Entry shape:
   --entry local       command=node args=[<binary-path>]
   --binary-path PATH  Override the local-entry binary path (defaults to dist/server.js)
 
+Scope:
+  --scope global      (default) edit the host's home-directory config:
+                        claude → ~/.claude.json
+                        codex  → ~/.codex/config.toml
+                        cursor → Cursor's settings.json
+  --scope project     edit a repo-local config rooted at the current directory:
+                        claude → ./.mcp.json
+                        codex  → ./.codex/config.toml
+                        cursor → ./.cursor/mcp.json
+
   --help, -h          Show this message
 `;
 
@@ -78,6 +90,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     uninstall: false,
     force: false,
     entry: 'npx',
+    scope: 'global',
     showHelp: false,
   };
 
@@ -125,6 +138,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
         out.binaryPath = next;
         break;
       }
+      case '--scope': {
+        const next = argv[++i];
+        if (next !== 'global' && next !== 'project') {
+          throw new UsageError(`--scope must be 'global' or 'project' (got: ${String(next)})`);
+        }
+        out.scope = next;
+        break;
+      }
       default:
         throw new UsageError(`Unknown flag: ${arg}`);
     }
@@ -142,9 +163,15 @@ export interface RunDeps {
 function chooseInstallers(args: ParsedArgs, all: Installer[]): Installer[] {
   if (args.all) return all;
   const picked: Installer[] = [];
-  if (args.claude) picked.push(all.find((i) => i.name === 'claude') ?? getInstallerByName('claude'));
-  if (args.codex) picked.push(all.find((i) => i.name === 'codex') ?? getInstallerByName('codex'));
-  if (args.cursor) picked.push(all.find((i) => i.name === 'cursor') ?? getInstallerByName('cursor'));
+  if (args.claude) {
+    picked.push(all.find((i) => i.name === 'claude') ?? getInstallerByName('claude', args.scope));
+  }
+  if (args.codex) {
+    picked.push(all.find((i) => i.name === 'codex') ?? getInstallerByName('codex', args.scope));
+  }
+  if (args.cursor) {
+    picked.push(all.find((i) => i.name === 'cursor') ?? getInstallerByName('cursor', args.scope));
+  }
   return picked;
 }
 
@@ -185,8 +212,23 @@ export async function runInstall(args: ParsedArgs, deps: RunDeps = {}): Promise<
     return 2;
   }
 
-  const allInstallers = deps.installers ?? getAllInstallers();
-  let installers = chooseInstallers(args, allInstallers);
+  let allInstallers: Installer[];
+  try {
+    allInstallers = deps.installers ?? getAllInstallers(args.scope);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    stderr(`Error: ${msg}`);
+    return 1;
+  }
+
+  let installers: Installer[];
+  try {
+    installers = chooseInstallers(args, allInstallers);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    stderr(`Error: ${msg}`);
+    return 1;
+  }
 
   if (args.all) {
     const detected: Installer[] = [];

@@ -37,9 +37,13 @@ Commands:
   serve        Run the stdio MCP server. Default when no command is given.
                  Example: skillforge-mcp serve
   install      Wire SkillForge into Claude Code / Codex CLI / Cursor.
+               Defaults to the host's global config; pass --scope project to
+               edit a repo-local config rooted at the current directory.
                Run "skillforge-mcp install --help" for installer flags.
                  Example: skillforge-mcp install --all
+                 Example: skillforge-mcp install --all --scope project
   uninstall    Reverse a previous install. Forwards to "install --uninstall".
+               Accepts the same --scope global|project flag.
                  Example: skillforge-mcp uninstall --all
   tools        List the 5 MCP tools the server exposes (params + examples).
                Pass --json for machine-readable output.

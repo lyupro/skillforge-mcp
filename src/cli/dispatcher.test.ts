@@ -53,6 +53,12 @@ describe('dispatcher.main', () => {
       }
       expect(out).toContain('Example:');
     });
+
+    it('documents the install --scope flag', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('--scope project');
+    });
   });
 
   describe('--version / -v', () => {
