@@ -50,7 +50,7 @@ describe('CursorInstaller.install', () => {
     const written = JSON.parse(readFileSync(configPath, 'utf8'));
     expect(written.mcp.servers.skillforge).toEqual({
       command: 'npx',
-      args: ['-y', '@lyupro/skillforge-mcp'],
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
     });
   });
 
@@ -68,7 +68,7 @@ describe('CursorInstaller.install', () => {
     expect(written.mcp.servers.other).toEqual({ command: 'node', args: ['/x.js'] });
     expect(written.mcp.servers.skillforge).toEqual({
       command: 'npx',
-      args: ['-y', '@lyupro/skillforge-mcp'],
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
     });
     expect(written.editor).toEqual({ fontSize: 14 });
   });
@@ -96,7 +96,7 @@ describe('CursorInstaller.install', () => {
     const written = JSON.parse(readFileSync(configPath, 'utf8'));
     expect(written.mcp.servers.skillforge).toEqual({
       command: 'npx',
-      args: ['-y', '@lyupro/skillforge-mcp'],
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
     });
     expect(existsSync(`${configPath}.backup`)).toBe(true);
   });
@@ -117,7 +117,7 @@ describe('CursorInstaller.uninstall', () => {
       JSON.stringify({
         mcp: {
           servers: {
-            skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp'] },
+            skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp', 'serve'] },
             other: { command: 'x', args: [] },
           },
         },

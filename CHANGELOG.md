@@ -2,6 +2,34 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-05-15
+
+Single-bin dispatcher — fixes `npx @lyupro/skillforge-mcp install --all` hanging on stdin.
+
+### Fixed
+
+- `npx @lyupro/skillforge-mcp install ...` previously hung because the package shipped two bins (`skillforge-mcp` → server, `skillforge` → install CLI), and `npx` matched the package's unscoped basename to the server bin, which silently waited on stdio. Both bins now resolve to a unified dispatcher that routes by the first positional argument.
+
+### Added
+
+- `src/cli/dispatcher.ts` — single CLI entry point that routes between `serve`, `install`, `uninstall`, `--help`, and `--version`.
+- `skillforge-mcp serve` subcommand — explicit invocation of the MCP stdio server (default when no command is supplied).
+- `skillforge-mcp --version` — prints the package version.
+- Dispatcher unit tests covering help, version, serve routing, install/uninstall delegation, and unknown-command rejection.
+
+### Changed
+
+- `package.json#bin` — both `skillforge-mcp` and `skillforge` now point at `dist/cli/dispatcher.js`.
+- `manifest.json#runtime.entry` — `dist/cli/dispatcher.js`. MCP host configs that auto-detect the entry pick up the dispatcher and fall through to `serve` when invoked with no args.
+- Installer-generated host config entries now write `args: ['-y', '@lyupro/skillforge-mcp', 'serve']` explicitly. Older `['-y', '@lyupro/skillforge-mcp']` entries still work — the default subcommand resolves to `serve`.
+
+### Verified
+
+- All existing tests passing + dispatcher suite added.
+- `pnpm lint` (`tsc --noEmit`) clean.
+- `pnpm build` clean.
+- Manual smoke test from a fresh shell: `npx --yes @lyupro/skillforge-mcp@1.1.1 install --all --dry-run` outputs planned edits and exits cleanly.
+
 ## [1.1.0] — 2026-05-14
 
 One-command install across Claude Code, Codex CLI, and Cursor.

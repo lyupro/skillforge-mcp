@@ -61,7 +61,7 @@ Modes:
   --force             Overwrite an existing SkillForge entry
 
 Entry shape:
-  --entry npx         (default) command=npx args=['-y','@lyupro/skillforge-mcp']
+  --entry npx         (default) command=npx args=['-y','@lyupro/skillforge-mcp','serve']
   --entry local       command=node args=[<binary-path>]
   --binary-path PATH  Override the local-entry binary path (defaults to dist/server.js)
 

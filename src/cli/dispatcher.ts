@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+/**
+ * SkillForge MCP CLI dispatcher.
+ *
+ * Single entry point for the `skillforge-mcp` and `skillforge` bins. Routes
+ * by the first positional argument so a single binary can act as both the
+ * MCP stdio server and the install CLI.
+ *
+ *   skillforge-mcp install [flags]     Wire SkillForge into host configs
+ *   skillforge-mcp uninstall [flags]   Reverse a previous install
+ *   skillforge-mcp serve               Run the MCP stdio server (default)
+ *   skillforge-mcp [no args]           Same as `serve`
+ *   skillforge-mcp --help              Print combined usage
+ *   skillforge-mcp --version           Print package version
+ *
+ * Why dispatcher exists:
+ *   `npx @scope/foo <subcommand>` matches a single bin by the package's
+ *   unscoped basename (`foo`). The earlier release shipped two separate
+ *   bins (`skillforge-mcp` → server, `skillforge` → install CLI). The
+ *   README-recommended `npx @lyupro/skillforge-mcp install --all` therefore
+ *   resolved to the server bin, which silently waited on stdin while users
+ *   thought the installer had hung. This dispatcher collapses both bins
+ *   into one and routes by argv, so the documented quick-start works
+ *   without an `--package=` override.
+ */
+
+import { main as installMain } from './install.js';
+
+const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
+
+Usage:
+  skillforge-mcp <command> [flags]
+
+Commands:
+  install      Wire SkillForge into Claude Code / Codex CLI / Cursor.
+               Run "skillforge-mcp install --help" for installer flags.
+  uninstall    Reverse a previous install. Forwards to "install --uninstall".
+  serve        Run the stdio MCP server. Default when no command is given.
+
+Options:
+  --help, -h   Show this message.
+  --version    Print the package version.
+
+Quick start:
+  npx -y @lyupro/skillforge-mcp install --all
+  npx -y @lyupro/skillforge-mcp install --all --dry-run
+`;
+
+export async function readPackageVersion(): Promise<string> {
+  const { readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, resolve } = await import('node:path');
+  const here = dirname(fileURLToPath(import.meta.url));
+  // dist/cli/dispatcher.js → package.json is two levels up.
+  const pkgPath = resolve(here, '..', '..', 'package.json');
+  const raw = await readFile(pkgPath, 'utf8');
+  const parsed = JSON.parse(raw) as { version?: unknown };
+  if (typeof parsed.version !== 'string') {
+    throw new Error('package.json missing string "version" field');
+  }
+  return parsed.version;
+}
+
+export interface ServeDeps {
+  start: () => Promise<void>;
+}
+
+async function defaultStartServe(): Promise<void> {
+  const { buildDeps, buildServer } = await import('../server.js');
+  const { StdioServerTransport } = await import(
+    '@modelcontextprotocol/sdk/server/stdio.js'
+  );
+  const deps = await buildDeps();
+  const server = buildServer(deps);
+  await server.connect(new StdioServerTransport());
+  await deps.folderWatcher.start();
+  const shutdown = async (): Promise<void> => {
+    await deps.folderWatcher.stop();
+  };
+  process.once('SIGTERM', () => {
+    void shutdown();
+  });
+  process.once('SIGINT', () => {
+    void shutdown();
+  });
+}
+
+/**
+ * Dispatcher entry. Returns:
+ *   - exit code (number) for install/uninstall/help/version/unknown — caller
+ *     should `process.exit(code)`.
+ *   - null for serve — caller must NOT call process.exit; the server keeps
+ *     the event loop alive via stdio transport + signal handlers.
+ */
+export async function main(
+  rawArgv: string[],
+  overrides: { startServe?: () => Promise<void> } = {},
+): Promise<number | null> {
+  const first = rawArgv[0];
+
+  if (first === '--help' || first === '-h') {
+    process.stdout.write(USAGE);
+    return 0;
+  }
+  if (first === '--version' || first === '-v') {
+    const version = await readPackageVersion();
+    process.stdout.write(`${version}\n`);
+    return 0;
+  }
+  if (first === 'install') {
+    return installMain(rawArgv.slice(1));
+  }
+  if (first === 'uninstall') {
+    return installMain(['--uninstall', ...rawArgv.slice(1)]);
+  }
+  if (first === 'serve' || first === undefined) {
+    const start = overrides.startServe ?? defaultStartServe;
+    await start();
+    return null;
+  }
+
+  process.stderr.write(
+    `skillforge-mcp: unknown command: ${first}\n\n${USAGE}`,
+  );
+  return 2;
+}
+
+import { fileURLToPath } from 'node:url';
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === process.argv[1];
+if (isDirectRun) {
+  main(process.argv.slice(2))
+    .then((code) => {
+      if (code !== null) process.exit(code);
+    })
+    .catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[skillforge-mcp] fatal: ${msg}`);
+      process.exit(1);
+    });
+}

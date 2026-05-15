@@ -1,6 +1,6 @@
 {
   "name": "@lyupro/skillforge-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Universal Skills MCP Server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
   "keywords": [
     "mcp",
@@ -28,8 +28,8 @@
   "main": "./dist/server.js",
   "types": "./dist/server.d.ts",
   "bin": {
-    "skillforge-mcp": "./dist/server.js",
-    "skillforge": "./dist/cli/install.js"
+    "skillforge-mcp": "./dist/cli/dispatcher.js",
+    "skillforge": "./dist/cli/dispatcher.js"
   },
   "files": [
     "dist",
@@ -73,5 +73,6 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
 }

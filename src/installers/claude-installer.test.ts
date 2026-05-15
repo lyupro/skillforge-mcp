@@ -50,7 +50,7 @@ describe('ClaudeInstaller.install', () => {
     const written = JSON.parse(readFileSync(configPath, 'utf8'));
     expect(written.mcpServers.skillforge).toEqual({
       command: 'npx',
-      args: ['-y', '@lyupro/skillforge-mcp'],
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
     });
   });
 
@@ -68,7 +68,7 @@ describe('ClaudeInstaller.install', () => {
     expect(written.mcpServers.other).toEqual({ command: 'node', args: ['/x.js'] });
     expect(written.mcpServers.skillforge).toEqual({
       command: 'npx',
-      args: ['-y', '@lyupro/skillforge-mcp'],
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
     });
     expect(written.otherTopLevel).toBe('preserved');
   });
@@ -96,7 +96,7 @@ describe('ClaudeInstaller.install', () => {
     const written = JSON.parse(readFileSync(configPath, 'utf8'));
     expect(written.mcpServers.skillforge).toEqual({
       command: 'npx',
-      args: ['-y', '@lyupro/skillforge-mcp'],
+      args: ['-y', '@lyupro/skillforge-mcp', 'serve'],
     });
     expect(existsSync(`${configPath}.backup`)).toBe(true);
   });
@@ -123,7 +123,7 @@ describe('ClaudeInstaller.uninstall', () => {
       configPath,
       JSON.stringify({
         mcpServers: {
-          skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp'] },
+          skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp', 'serve'] },
           other: { command: 'x', args: [] },
         },
       }),

@@ -54,7 +54,7 @@ describe('CodexInstaller.install', () => {
     expect(result.status).toBe('installed');
     const written = readToml(configPath) as { mcp_servers: { skillforge: { command: string; args: string[] } } };
     expect(written.mcp_servers.skillforge.command).toBe('npx');
-    expect(written.mcp_servers.skillforge.args).toEqual(['-y', '@lyupro/skillforge-mcp']);
+    expect(written.mcp_servers.skillforge.args).toEqual(['-y', '@lyupro/skillforge-mcp', 'serve']);
   });
 
   it('preserves other mcp_servers tables during merge', async () => {
@@ -119,7 +119,7 @@ describe('CodexInstaller.uninstall', () => {
       configPath,
       toml.stringify({
         mcp_servers: {
-          skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp'] },
+          skillforge: { command: 'npx', args: ['-y', '@lyupro/skillforge-mcp', 'serve'] },
           other: { command: 'x', args: [] },
         },
       } as toml.JsonMap),

@@ -41,7 +41,7 @@ interface ServerEntry {
 
 function buildEntry(opts: InstallOptions, binaryFallback: string): ServerEntry {
   if (opts.entry === 'npx') {
-    return { command: 'npx', args: ['-y', NPX_PKG] };
+    return { command: 'npx', args: ['-y', NPX_PKG, 'serve'] };
   }
   const binary = opts.binaryPath ?? binaryFallback;
   return { command: 'node', args: [binary] };

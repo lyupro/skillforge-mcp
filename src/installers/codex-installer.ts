@@ -45,7 +45,7 @@ interface CodexConfig {
 
 function buildEntry(opts: InstallOptions, binaryFallback: string): ServerEntry {
   if (opts.entry === 'npx') {
-    return { command: 'npx', args: ['-y', NPX_PKG] };
+    return { command: 'npx', args: ['-y', NPX_PKG, 'serve'] };
   }
   return { command: 'node', args: [opts.binaryPath ?? binaryFallback] };
 }
