@@ -43,6 +43,16 @@ describe('dispatcher.main', () => {
       expect(code).toBe(0);
       expect(writes.join('')).toContain('Commands:');
     });
+
+    it('lists every command with a usage example', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      const out = writes.join('');
+      for (const cmd of ['serve', 'install', 'uninstall', 'tools', '--version']) {
+        expect(out).toContain(cmd);
+      }
+      expect(out).toContain('Example:');
+    });
   });
 
   describe('--version / -v', () => {
@@ -90,6 +100,21 @@ describe('dispatcher.main', () => {
     it('uninstall with no flags returns usage error 2', async () => {
       const code = await main(['uninstall']);
       expect(code).toBe(2);
+    });
+  });
+
+  describe('tools subcommand', () => {
+    it('routes to the tools handler and returns its exit code', async () => {
+      const code = await main(['tools']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('skills__list');
+    });
+
+    it('forwards flags to the tools handler', async () => {
+      const code = await main(['tools', '--json']);
+      expect(code).toBe(0);
+      const parsed = JSON.parse(writes.join('')) as { tools: unknown[] };
+      expect(parsed.tools).toHaveLength(5);
     });
   });
 

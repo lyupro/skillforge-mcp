@@ -25,6 +25,7 @@
  */
 
 import { main as installMain } from './install.js';
+import { main as toolsMain } from './tools.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
 
@@ -32,14 +33,21 @@ Usage:
   skillforge-mcp <command> [flags]
 
 Commands:
+  serve        Run the stdio MCP server. Default when no command is given.
+                 Example: skillforge-mcp serve
   install      Wire SkillForge into Claude Code / Codex CLI / Cursor.
                Run "skillforge-mcp install --help" for installer flags.
+                 Example: skillforge-mcp install --all
   uninstall    Reverse a previous install. Forwards to "install --uninstall".
-  serve        Run the stdio MCP server. Default when no command is given.
+                 Example: skillforge-mcp uninstall --all
+  tools        List the 5 MCP tools the server exposes (params + examples).
+               Pass --json for machine-readable output.
+                 Example: skillforge-mcp tools --json
 
 Options:
   --help, -h   Show this message.
-  --version    Print the package version.
+  --version, -v  Print the package version.
+                 Example: skillforge-mcp --version
 
 Quick start:
   npx -y @lyupro/skillforge-mcp install --all
@@ -112,6 +120,9 @@ export async function main(
   }
   if (first === 'uninstall') {
     return installMain(['--uninstall', ...rawArgv.slice(1)]);
+  }
+  if (first === 'tools') {
+    return toolsMain(rawArgv.slice(1));
   }
   if (first === 'serve' || first === undefined) {
     const start = overrides.startServe ?? defaultStartServe;
