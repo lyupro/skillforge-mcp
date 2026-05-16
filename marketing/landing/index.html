@@ -96,10 +96,10 @@
       <h1>Universal Skills, One MCP Server</h1>
       <p class="tagline">Load Markdown skills from arbitrary folders into <strong>any MCP-capable LLM tool</strong> — Claude Code, Codex CLI, Cursor, or your own client. Lazy-by-design. Cross-tool. Open source.</p>
       <div class="badges">
-        <span class="badge">v1.3.0</span>
+        <span class="badge" data-sf="version">v1.3.0</span>
         <span class="badge">MIT licensed</span>
         <span class="badge">Node ≥ 20</span>
-        <span class="badge">561 tests</span>
+        <span class="badge" data-sf="tests">561 tests</span>
       </div>
       <div class="cta-group">
         <a class="sfm-cta sfm-cta-primary" href="https://github.com/lyupro/skillforge-mcp">Get Started on GitHub</a>
@@ -241,7 +241,7 @@ args = ["-y", "@lyupro/skillforge-mcp", "serve"]
   <!-- =================== SAMPLE SKILLS =================== -->
   <section class="sfm-section">
     <div class="container">
-      <h2>10 sample skills shipped</h2>
+      <h2><span data-sf="sampleSkills">10</span> sample skills shipped</h2>
       <p class="lead">Production-quality, ready to invoke. Covers all three strategies.</p>
       <div class="sfm-skills-grid">
         <div class="sfm-skill-chip"><strong>apple-hig-check</strong><span>prompt · 8-axis HIG audit</span></div>
@@ -309,6 +309,32 @@ args = ["-y", "@lyupro/skillforge-mcp", "serve"]
     if (el) el.addEventListener('input', calc);
   });
   calc();
+
+  // Live site-data: fetch version/test/sampleSkills from the repo and fill
+  // [data-sf] placeholders. Falls back silently to hardcoded text on any error.
+  (function () {
+    var URL = 'https://raw.githubusercontent.com/lyupro/skillforge-mcp/master/marketing/landing/site-data.json';
+    // Map each data-sf key to the display text it should produce.
+    var formatters = {
+      version:      function (v) { return 'v' + v; },
+      tests:        function (v) { return v + ' tests'; },
+      sampleSkills: function (v) { return String(v); },
+    };
+    try {
+      fetch(URL)
+        .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+        .then(function (data) {
+          document.querySelectorAll('[data-sf]').forEach(function (el) {
+            var key = el.getAttribute('data-sf');
+            if (Object.prototype.hasOwnProperty.call(data, key) &&
+                Object.prototype.hasOwnProperty.call(formatters, key)) {
+              el.textContent = formatters[key](data[key]);
+            }
+          });
+        })
+        .catch(function () { /* network error — keep hardcoded fallback text */ });
+    } catch (_) { /* fetch not available (e.g. very old browser) — silent */ }
+  })();
 
   // Install tabs
   document.querySelectorAll('.sfm-tabs button').forEach(function (btn) {
