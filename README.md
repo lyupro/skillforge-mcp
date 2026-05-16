@@ -233,15 +233,21 @@ For production use with untrusted skill authors, run SkillForge inside Docker or
 
 ## Updating
 
+Pick the block that matches how you installed.
+
 ```bash
-# Plugin install
+# Installed as a Claude Code plugin
 /plugin update skillforge
 
-# npm install
+# Installed via the install CLI (global npm package)
+npm install -g @lyupro/skillforge-mcp@latest
+# host wiring already points at the global bin — restart the host session
+
+# Installed as a bare MCP server (npx)
 claude mcp remove skillforge
 claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp@latest
 
-# Local-build install
+# Local-build install (git clone)
 cd skillforge-mcp
 git pull
 pnpm install
