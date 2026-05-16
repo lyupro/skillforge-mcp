@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 
 Goals: replace per-tool auto-loading of 100+ skills with lazy-by-design MCP discovery, save ~4380 tokens per session init, work across LLM tools through a single config.
 
-**Strategic context:** standalone open-source product under the Lyu Pro brand. Branded GitHub repo `lyupro/skillforge-mcp` + npm package `@lyupro/skillforge-mcp` + listing in `lyupro/llm-plugins-marketplace` (own marketplace, Variant B). v1.0.0 prep ✅ landed on `master` — **v1.0.0** version stamped across `package.json` / `plugin.json` / `manifest.json`, CHANGELOG.md + RELEASE_NOTES.md + docs/PUBLISHING.md runbook + `marketing/landing/` (WordPress-ready HTML) + `marketing/copy/` (Twitter / LinkedIn / Reddit / Show HN drafts). Sibling marketplace repo `lyupro/llm-plugins-marketplace` (scaffolded locally, separate git history) lists SkillForge in `marketplace.json`. External publish actions (GitHub release + npm publish + marketplace push + landing paste + social posts) await operator hand-off.
+**Strategic context:** standalone open-source product under the Lyu Pro brand. Branded GitHub repo `lyupro/skillforge-mcp` + npm package `@lyupro/skillforge-mcp` + listing in `lyupro/llm-plugins-marketplace` (own marketplace, Variant B). v1.0.0 prep ✅ landed on `master` — **v1.0.0** version stamped across `package.json` / `plugin.json` / `manifest.json`, CHANGELOG.md + RELEASE_NOTES.md + docs/PUBLISHING.md runbook + `marketing/copy/` (Twitter / LinkedIn / Reddit / Show HN drafts). Sibling marketplace repo `lyupro/llm-plugins-marketplace` (scaffolded locally, separate git history) lists SkillForge in `marketplace.json`. External publish actions (GitHub release + npm publish + marketplace push + landing paste + social posts) await operator hand-off.
 
 **Sibling repo, not nested.** This project sits parallel to the parent project's repo on disk; they share no git history.
 
@@ -91,7 +91,7 @@ After meaningful changes:
 
 - Parent-project pipeline integration happens in the parent project's repo. This repo stays MCP-only.
 - Marketplace catalog lives in the sibling `llm-plugins-marketplace/` repo (scaffolded locally, separate git history). Listing entry already populated; push to GitHub is operator-side.
-- Marketing surface — landing-page HTML lives at `marketing/landing/index.html` (WordPress paste-ready) and launch copy at `marketing/copy/` (Twitter / LinkedIn / Reddit / Show HN drafts). Deploy to `lyupro.com/skillforge-mcp` + social posting is operator-side.
+- Marketing surface — launch copy (Twitter / LinkedIn / Reddit / Show HN drafts) lives at `marketing/copy/`. The landing-page HTML moved to the brand-site repo `lyupro/lyupro-site` (`pages/tools/skillforge/`); it deploys to `lyupro.com/tools/skillforge` and fetches its changelog live from this repo. Social posting + landing deploy are operator-side.
 - npm publish + GitHub release — fully prepped (CHANGELOG.md, RELEASE_NOTES.md, package.json files whitelist, `prepublishOnly: pnpm build`, `npm pack --dry-run` verified at 58 KB / 189 entries). Runbook in [`docs/PUBLISHING.md`](./docs/PUBLISHING.md). Execution requires npm credentials + `npm publish --access public` operator-side.
 
 ## Language
