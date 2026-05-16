@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.2.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, terminal `tools` + `folders` subcommands, global/project install scopes, Claude Code plugin packaging, 535 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.3.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, terminal `tools` + `folders` subcommands (folder aliases, enable/disable toggle, tag filter), global/project install scopes, Claude Code plugin packaging, 561 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -105,7 +105,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor. Flags: `--claude` / `--codex` / `--cursor` / `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
 | `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
 | `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
-| `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `reset`. |
+| `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `enable` / `disable` / `reset`. |
 | `--version`, `-v` | Print the package version. |
 | `--help`, `-h` | Print combined usage. |
 
@@ -123,21 +123,29 @@ Prints every MCP tool the server exposes (`skills__list`, `skills__get`, `skills
 Folder management is also available from the shell, not just via the `skills__configure` MCP tool inside an LLM session:
 
 ```bash
-skillforge folders list [--json]                        # print registered folders
-skillforge folders add <path> [flags]                   # register a folder
-skillforge folders remove <path>                         # remove a folder entry
-skillforge folders reset --yes                           # reset folders to the default (empty) list
+skillforge folders list [--json] [--tag <name>]          # print registered folders
+skillforge folders add <path> [flags]                    # register a folder
+skillforge folders remove <path|alias>                    # remove a folder entry
+skillforge folders alias <path|alias> <name>              # set or change a folder alias
+skillforge folders enable <path|alias>                    # re-activate a disabled folder
+skillforge folders disable <path|alias>                   # deactivate a folder (kept in config)
+skillforge folders reset --yes                            # reset folders to the default (empty) list
 ```
 
 `add` flags:
 
 - `--priority <n>` — folder priority (default `100`; higher wins on name collisions).
-- `--tags <a,b,c>` — comma-separated tags.
+- `--alias <name>` — a short kebab-case handle, unique across folders. Lets `remove` / `enable` / `disable` target the folder without typing the full path.
+- `--tags <a,b,c>` — comma-separated tags. Filter on them via `folders list --tag <name>` or the `skills__list` `folderTag` argument.
 - `--disabled` — register the folder disabled.
 
 ```bash
-skillforge folders add ~/.lyupro/skills --priority 50 --tags work,review
+skillforge folders add ~/.lyupro/skills --priority 50 --alias core --tags work,review
+skillforge folders disable core            # address it by alias, not by path
+skillforge folders list --tag work         # only folders tagged "work"
 ```
+
+`alias` is one unique handle per folder (addressing); `tags` are many shared labels (grouping and filtering) — see [docs/CONFIGURATION.md](./docs/CONFIGURATION.md) for the full contrast.
 
 `reset` requires `--yes` to apply — without it, the command prints what would change and makes no edits. All `folders` actions read and write the same persisted config (`~/.lyupro/.skillforge/config.json`) as the `skills__configure` MCP tool.
 
@@ -147,7 +155,7 @@ If you register a folder that already lives inside another tool's native skill s
 
 | Tool | Purpose |
 |------|---------|
-| `skills__list`      | Enumerate available skills (metadata only). Filters: `folder`, `search`, `source`. |
+| `skills__list`      | Enumerate available skills (metadata only). Filters: `folder`, `search`, `source`, `folderTag`. |
 | `skills__get`       | Fetch full SKILL.md body + metadata for one skill. |
 | `skills__invoke`    | Execute a skill via its assigned strategy, wrapped in the decorator chain (Logging → Timeout → Cache). Composite skills (`metadata.skills: [a, b]`) walk nested skills sequentially with DFS cycle detection. |
 | `skills__configure` | Manage configured folders + manual blacklist. Actions: `add_folder`, `remove_folder`, `list_folders`, `set_blacklist`, `get_blacklist`, `reset`. Persists to the config file and reconciles in-process state without restart. |

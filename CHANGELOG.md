@@ -2,6 +2,27 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-05-16
+
+Folder ergonomics — address folders by a short alias, toggle them on and off, and filter skills by folder tag.
+
+### Added
+
+- Folder alias. A folder entry now carries an optional kebab-case `alias` — a single short handle for a folder. `skillforge folders add <path> --alias <name>` registers it; `skillforge folders remove <name>` and the new `skillforge folders alias <path|alias> <name>` accept the alias in place of the full absolute path. The full path keeps working everywhere. Aliases are validated kebab-case and unique across registered folders — a collision fails with exit ≠ 0 and leaves the config untouched. The `skills__configure` `add_folder` action accepts an `alias` field too, and `folders list` shows an `ALIAS` column.
+- `skillforge folders enable <path|alias>` / `skillforge folders disable <path|alias>` — a two-way toggle for the `enabled` flag. `folders add --disabled` previously had no inverse; re-activating a folder meant hand-editing `config.json`. A disabled folder stays in the config but is skipped on scan.
+- Folder-tag filtering. Folder `tags` were written to the config but never read. `skills__list` now accepts a `folderTag` argument that keeps only skills under folders carrying that tag, and `skillforge folders list --tag <name>` filters the listing the same way. `docs/CONFIGURATION.md` gains a "tags vs alias" section: `alias` is one unique handle per folder for addressing, `tags` are many shared labels for grouping.
+
+### Changed
+
+- `src/cli/folders.ts` split into four flat sibling modules (`folders.ts`, `folders-handlers.ts`, `folders-format.ts`, `folders-shared.ts`) to stay under the 400-line file gate. The `dispatcher.ts` import path is unchanged.
+
+### Verified
+
+- 561 / 561 tests passing + 1 win32-skip.
+- `pnpm lint` (`tsc --noEmit`) clean.
+- `pnpm build` clean.
+- `pnpm check:size` — all source files ≤ 400 lines.
+
 ## [1.2.0] — 2026-05-16
 
 Terminal-side tooling — inspect MCP tools and manage skill folders without an LLM session, plus repo-local install scope and Claude Code plugin packaging.
@@ -157,6 +178,7 @@ All 10 verified through real parse pipeline + `StrategyFactory.create()` correct
 - **`pnpm build`** clean.
 - **`pnpm smoke`** end-to-end via subprocess `dist/server.js` — LoggingDecorator trace visible.
 
+[1.3.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.3.0
 [1.2.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.2.0
 [1.1.1]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.1.1
 [1.1.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.1.0
