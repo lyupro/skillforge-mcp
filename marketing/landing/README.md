@@ -1,6 +1,6 @@
 # SkillForge MCP — Landing Page
 
-Self-contained landing page for [`lyupro.com/skillforge-mcp`](https://lyupro.com/skillforge-mcp). One file: HTML + inline CSS + inline JS. No build step, no JavaScript framework, no external CDN libraries.
+Self-contained landing page for [`lyupro.com/tools/skillforge`](https://lyupro.com/tools/skillforge). One file: HTML + inline CSS + inline JS. No build step, no JavaScript framework, no external CDN libraries.
 
 The page **self-updates from Git**: at load it fetches `site-data.json` (version / test count / sample-skill count) and `CHANGELOG.md` from raw GitHub, so editing those files in the repo refreshes the live page with no HTML re-edit. If a fetch fails the page falls back to hardcoded values — it never breaks.
 
@@ -57,14 +57,14 @@ No server needed. The calculator and tabs run client-side. The version badges an
 
 ### A. Static host (Cloudflare Pages / Vercel / GitHub Pages)
 
-Drop the file at the root of a static site. The canonical URL is set to `https://lyupro.com/skillforge-mcp`; adjust the `<link rel="canonical">` and Open Graph URL if you publish under a different path.
+Drop the file at the root of a static site. The canonical URL is set to `https://lyupro.com/tools/skillforge`; adjust the `<link rel="canonical">` and Open Graph URL if you publish under a different path.
 
 ### B. WordPress (lyupro.com today)
 
 Two paths depending on your block editor preference:
 
 1. **Custom HTML block** (recommended for verbatim paste):
-   - Edit the target page (`lyupro.com/skillforge-mcp`).
+   - Edit the target page (`lyupro.com/tools/skillforge`).
    - Add a **Custom HTML** block.
    - Open `index.html`, copy everything **between** `<body class="sfm-landing">` and `</body>` (inclusive of the inner `<div class="sfm-landing">` wrapper + `<style>` block — the `<style>` block before `</head>` should be copied **into** the HTML block as well so the styles travel with the content).
    - Paste into the Custom HTML block.
