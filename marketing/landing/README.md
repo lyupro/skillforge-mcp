@@ -10,7 +10,7 @@ Self-contained landing page for [`lyupro.com/skillforge-mcp`](https://lyupro.com
 - **Pain section** — 4 cards (tool-specific formats / eager auto-load / no team registry / script security).
 - **Features section** — 4 mirrored solution cards.
 - **Token savings calculator** — 4 inputs (skills, sessions, used, tokens), live-updates 5 result rows + monthly-saved highlight.
-- **Install tabs** — Claude Code / Codex CLI / Cursor / Custom MCP client, one accessible tab panel each.
+- **Install section** — one-command `install --all` block, then tabs for Claude Code / Codex CLI / Cursor / Any MCP host, one accessible tab panel each.
 - **Sample skills showcase** — 10 chips covering prompt / script / hybrid strategies.
 - **Documentation grid** — 6 cards linking to README + 5 docs.
 - **Footer** — GitHub / npm / Issues / Security / Lyu Pro links + copyright.

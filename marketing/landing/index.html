@@ -182,7 +182,7 @@ npx -y @lyupro/skillforge-mcp install --all</code></pre>
         <button role="tab" aria-selected="true" aria-controls="sfm-tab-claude" data-target="sfm-tab-claude">Claude Code</button>
         <button role="tab" aria-selected="false" aria-controls="sfm-tab-codex" data-target="sfm-tab-codex">Codex CLI</button>
         <button role="tab" aria-selected="false" aria-controls="sfm-tab-cursor" data-target="sfm-tab-cursor">Cursor</button>
-        <button role="tab" aria-selected="false" aria-controls="sfm-tab-custom" data-target="sfm-tab-custom">Custom MCP client</button>
+        <button role="tab" aria-selected="false" aria-controls="sfm-tab-custom" data-target="sfm-tab-custom">Any MCP host</button>
       </div>
 
       <div id="sfm-tab-claude" class="sfm-tab-panel" role="tabpanel" aria-hidden="false">
@@ -220,17 +220,20 @@ args = ["-y", "@lyupro/skillforge-mcp", "serve"]
       </div>
 
       <div id="sfm-tab-custom" class="sfm-tab-panel" role="tabpanel" aria-hidden="true">
-<pre><code>// Node.js + @modelcontextprotocol/sdk
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-
-const transport = new StdioClientTransport({
-  command: "npx",
-  args: ["-y", "@lyupro/skillforge-mcp", "serve"],
-});
-const client = new Client({ name: "my-app", version: "1.0.0" }, { capabilities: {} });
-await client.connect(transport);
-const skills = await client.callTool({ name: "skills__list", arguments: {} });</code></pre>
+<pre><code>// SkillForge is a standard MCP stdio server — it drops into ANY MCP host.
+// Point that host's MCP config at the same server entry:
+{
+  "mcpServers": {
+    "skillforge": {
+      "command": "npx",
+      "args": ["-y", "@lyupro/skillforge-mcp", "serve"]
+    }
+  }
+}
+// Claude Desktop, Windsurf, Cline, Zed, VS Code MCP, JetBrains AI,
+// Gemini CLI, or your own @modelcontextprotocol/sdk client — same
+// server block, host-specific config path. The five skills__* tools
+// appear once the host connects.</code></pre>
       </div>
     </div>
   </section>
