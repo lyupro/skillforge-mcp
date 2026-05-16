@@ -46,7 +46,10 @@ export function buildServer(deps: ServerDeps): McpServer {
     'skills__list',
     {
       title: 'List skills',
-      description: 'List available skills, optionally filtered by folder / search / source.',
+      description:
+        'List available skills, optionally filtered by folder / search / source / folderTag. ' +
+        'folderTag restricts results to skills whose folder has that tag in config.json folders[].tags. ' +
+        'Note: env-override folders (SKILLFORGE_FOLDERS) carry no tags — folderTag returns nothing for them.',
       inputSchema: listInputSchema,
     },
     async (args) => {

@@ -51,10 +51,13 @@ Resolved paths are deduplicated and absolutised before being handed to `FileScan
 Folders can be registered three ways: the `SKILLFORGE_FOLDERS` env var, the `skills__configure` MCP tool (from inside an LLM session), and the `skillforge folders` CLI subcommand (from the shell). All three persist to the same config file.
 
 ```bash
-skillforge folders list [--json]                 # print registered folders
-skillforge folders add <path> [flags]            # register a folder
-skillforge folders remove <path>                 # remove a folder entry
-skillforge folders reset --yes                   # reset folders to the default (empty) list
+skillforge folders list [--json] [--tag <name>]       # print registered folders (optionally filtered by tag)
+skillforge folders add <path> [flags]                  # register a folder
+skillforge folders remove <path|alias>                 # remove a folder entry
+skillforge folders alias <path|alias> <name>           # set or change a folder alias
+skillforge folders enable <path|alias>                 # enable a disabled folder
+skillforge folders disable <path|alias>                # disable a folder without removing it
+skillforge folders reset --yes                         # reset folders to the default (empty) list
 ```
 
 `add` flags:
@@ -62,6 +65,7 @@ skillforge folders reset --yes                   # reset folders to the default 
 - `--priority <n>` — folder priority (default `100`; higher wins on name collisions).
 - `--tags <a,b,c>` — comma-separated tags.
 - `--disabled` — register the folder disabled.
+- `--alias <name>` — short kebab-case handle for addressing the folder in `remove`, `alias`, `enable`, and `disable` commands.
 
 `reset` requires `--yes` to apply — without it, the command prints what would change and makes no edits. The `folders` subcommand exposes the same `ConfigStore` folder operations as the `skills__configure` MCP tool, so use whichever surface fits your workflow.
 
@@ -127,7 +131,7 @@ The full Zod schema lives in `src/config/config-schema.ts`. Below is the camelCa
 | `path` | `string` | — | Absolute or relative — resolved via `path.resolve()` on save. Min length 1. |
 | `priority` | `int` | `100` | Higher wins on name collisions across folders (`SkillResolver`). |
 | `enabled` | `boolean` | `true` | `false` keeps the entry but excludes it from `loadResolvedConfig` until re-enabled. |
-| `tags` | `string[]` | `[]` | Informational only — not consumed at runtime yet, reserved for future "scan only folders with tag X" filters. |
+| `tags` | `string[]` | `[]` | Category labels for the folder. Many tags per folder are allowed; tags are not unique. Used by `folders list --tag` and the `skills__list` `folderTag` filter to restrict output to folders that carry a given label. |
 
 ### `blacklist[]`
 
@@ -353,6 +357,44 @@ Higher priority wins on name collisions. `SkillResolver.resolve` picks the team-
 ```
 
 Bigger `debounceMs` = fewer rescans during a rapid burst of `.md` edits, at the cost of longer staleness window.
+
+---
+
+## Folder tags vs alias — semantics
+
+These two folder fields serve distinct purposes and should not be conflated:
+
+**`alias`** — one optional unique identifier per folder. A kebab-case string (e.g. `work`, `team-skills`). Used to address the folder by a short name in the CLI: `folders remove work`, `folders disable team-skills`. Because it is used for unambiguous lookup, each alias must be unique across all registered folders.
+
+**`tags`** — zero or more non-unique category labels per folder (e.g. `["work", "review"]`). Multiple folders may share the same tag. Tags are for grouping and filtering: selecting all folders (and therefore all skills) that belong to a conceptual category.
+
+```bash
+# Register two folders under a shared "work" tag
+skillforge folders add ~/skills/personal --tags work --alias personal
+skillforge folders add ~/skills/team     --tags work,review --alias team
+
+# Show only folders tagged "work"
+skillforge folders list --tag work
+
+# Show only skills from "work"-tagged folders (MCP)
+# skills__list with folderTag="work"
+```
+
+---
+
+## Filtering skills by folder tag (`folderTag`)
+
+The `skills__list` MCP tool accepts an optional `folderTag` parameter. When set, only skills whose source folder has that tag in `config.json folders[].tags` are returned. All other filters (`folder`, `source`, `search`) compose normally with `folderTag`.
+
+```json
+{"action": "skills__list", "folderTag": "work"}
+```
+
+This makes it possible for an LLM session or automation script to scope skill lookups to a logical group without knowing the exact folder paths.
+
+**Edge case — env-override folders:** When `SKILLFORGE_FOLDERS` is set, it bypasses `config.json` entirely and the resolved folders carry no tag metadata. A `folderTag` filter will therefore return an empty skill list in that mode. This is expected behaviour: env-override is an escape hatch for single-session path injection, not a persistent configuration surface.
+
+**Intended future use-case:** Per-phase folder selection. A workflow with multiple stages (e.g. idea-scout → build → review) can tag folders per phase (`tags: ["build"]`, `tags: ["review"]`) and pass the matching `folderTag` at each phase transition to load only the relevant skills without exposing unrelated prompts to the model context.
 
 ---
 

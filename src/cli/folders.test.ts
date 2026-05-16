@@ -172,6 +172,25 @@ describe('folders.main', () => {
       expect(out).toContain('ALIAS');
       expect(out).toContain('work');
     });
+
+    it('--tag filters to folders with that tag', async () => {
+      const other = join(tmpRoot, 'skills-tag');
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(other, { recursive: true });
+      await main(['add', skillDir, '--tags', 'work'], deps());
+      await main(['add', other, '--tags', 'review'], deps());
+      out = '';
+      const code = await main(['list', '--tag', 'work'], deps());
+      expect(code).toBe(0);
+      expect(out).toContain(skillDir);
+      expect(out).not.toContain(other);
+    });
+
+    it('--tag with no value returns exit 2', async () => {
+      const code = await main(['list', '--tag'], deps());
+      expect(code).toBe(2);
+      expect(err).toContain('--tag requires a value');
+    });
   });
 
   describe('remove', () => {

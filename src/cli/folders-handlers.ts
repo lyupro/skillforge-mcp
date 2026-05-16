@@ -24,19 +24,36 @@ export async function handleList(
   stderr: (t: string) => void,
 ): Promise<number> {
   let asJson = false;
-  for (const arg of rest) {
+  let tagFilter: string | undefined;
+
+  for (let i = 0; i < rest.length; i += 1) {
+    const arg = rest[i]!;
     if (arg === '--json') {
       asJson = true;
+    } else if (arg === '--tag') {
+      const value = rest[i + 1];
+      if (value === undefined) {
+        stderr(`skillforge folders list: --tag requires a value\n`);
+        return 2;
+      }
+      tagFilter = value;
+      i += 1;
     } else {
       stderr(`skillforge folders list: unknown flag: ${arg}\n`);
       return 2;
     }
   }
+
   const config = await store.load();
+  const folders =
+    tagFilter !== undefined
+      ? config.folders.filter((f) => f.tags.includes(tagFilter!))
+      : config.folders;
+
   if (asJson) {
-    stdout(`${JSON.stringify({ folders: config.folders }, null, 2)}\n`);
+    stdout(`${JSON.stringify({ folders }, null, 2)}\n`);
   } else {
-    stdout(formatFoldersTable(config.folders));
+    stdout(formatFoldersTable(folders));
   }
   return 0;
 }
