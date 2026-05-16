@@ -72,10 +72,10 @@ The styles are scoped to `.sfm-landing`, so the inner `<div class="sfm-landing">
 
 ## When to refresh
 
-- After every npm publish: version badge in hero (`v1.0.0` literal).
+- After every npm publish: version badge + test-count badge in hero (currently `v1.3.0` / `561 tests` literals).
 - After adding sample skills: chip grid.
 - After landing on the official Anthropic marketplace: add badge and link.
-- After Cursor verification lands: drop the "Cursor pending" caveat from Cursor tab content if you mention it elsewhere.
+- Keep the Cursor install tab pointed at `~/.cursor/mcp.json` with a top-level `mcpServers` key — Cursor does not read the VS Code-style nested `mcp.servers` shape.
 
 ## Not included (on purpose)
 
