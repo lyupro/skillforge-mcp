@@ -102,6 +102,26 @@ describe('configSchema', () => {
     expect(() => configSchema.parse({ folders: [{ path: '' }] })).toThrow();
   });
 
+  it('accepts a kebab-case folder alias', () => {
+    const result = configSchema.parse({
+      folders: [{ path: '/my/skills', alias: 'my-folder' }],
+    });
+    expect(result.folders[0]!.alias).toBe('my-folder');
+  });
+
+  it('parses a folder entry without an alias (field is optional)', () => {
+    const result = configSchema.parse({ folders: [{ path: '/my/skills' }] });
+    expect(result.folders[0]!.alias).toBeUndefined();
+  });
+
+  it('rejects non-kebab-case folder aliases', () => {
+    for (const bad of ['My_Folder', 'bad alias', '', 'UPPER', 'trailing-']) {
+      expect(() =>
+        configSchema.parse({ folders: [{ path: '/my/skills', alias: bad }] }),
+      ).toThrow();
+    }
+  });
+
   it('fills security defaults when section is omitted', () => {
     const result = configSchema.parse({});
     expect(result.security.auditPatterns).toContain('eval\\(');

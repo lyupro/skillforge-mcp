@@ -75,6 +75,12 @@ const TOOL_REFS: ToolRef[] = [
       },
       { name: 'folder', type: 'string', required: false, note: 'Folder path — required by add_folder / remove_folder.' },
       {
+        name: 'alias',
+        type: 'string',
+        required: false,
+        note: 'Optional kebab-case alias for the folder — used by add_folder.',
+      },
+      {
         name: 'blacklist',
         type: 'string[]',
         required: false,

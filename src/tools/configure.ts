@@ -20,6 +20,7 @@ export const configureInputSchema = {
     'reset',
   ]),
   folder: z.string().optional(),
+  alias: z.string().optional(),
   blacklist: z.array(z.string()).optional(),
 } as const;
 
@@ -65,7 +66,7 @@ async function reconcileFolders(deps: ServerDeps): Promise<PersistedConfig> {
 
 export async function handleConfigure(
   deps: ServerDeps,
-  args: { action: ConfigureAction; folder?: string; blacklist?: string[] },
+  args: { action: ConfigureAction; folder?: string; alias?: string; blacklist?: string[] },
 ): Promise<ConfigureResult> {
   const { action } = args;
 
@@ -99,7 +100,21 @@ export async function handleConfigure(
       const persisted = await deps.configStore.load();
       const alreadyPresent = persisted.folders.some((f) => resolve(f.path) === absPath);
       if (!alreadyPresent) {
-        persisted.folders.push({ path: absPath, priority: 100, enabled: true, tags: [] });
+        if (args.alias !== undefined && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(args.alias)) {
+          throw new Error(
+            `configure: invalid alias "${args.alias}" — use kebab-case (e.g. my-folder)`,
+          );
+        }
+        if (args.alias !== undefined && persisted.folders.some((f) => f.alias === args.alias)) {
+          throw new Error(`configure: alias already in use: ${args.alias}`);
+        }
+        persisted.folders.push({
+          path: absPath,
+          priority: 100,
+          enabled: true,
+          tags: [],
+          ...(args.alias !== undefined ? { alias: args.alias } : {}),
+        });
       }
       // Why: always save even on no-op — simpler than branching, atomic write is cheap.
       await deps.configStore.save(persisted);

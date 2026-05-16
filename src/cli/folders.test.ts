@@ -38,9 +38,9 @@ describe('folders.main', () => {
     stderr: (t) => (err += t),
   });
 
-  async function readConfig(): Promise<{ folders: Array<{ path: string }> }> {
+  async function readConfig(): Promise<{ folders: Array<{ path: string; alias?: string }> }> {
     const raw = await readFile(configPath, 'utf8');
-    return JSON.parse(raw) as { folders: Array<{ path: string }> };
+    return JSON.parse(raw) as { folders: Array<{ path: string; alias?: string }> };
   }
 
   describe('add', () => {
@@ -114,6 +114,34 @@ describe('folders.main', () => {
       const code = await main(['add'], deps());
       expect(code).toBe(2);
     });
+
+    it('persists an --alias to the new entry', async () => {
+      const code = await main(['add', skillDir, '--alias', 'work'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('work');
+    });
+
+    it('rejects a non-kebab-case --alias with exit 2', async () => {
+      const code = await main(['add', skillDir, '--alias', 'Bad_Alias'], deps());
+      expect(code).toBe(2);
+      expect(err).toContain('invalid --alias');
+    });
+
+    it('rejects a duplicate alias and leaves config unchanged', async () => {
+      const other = join(tmpRoot, 'skills-2');
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(other, { recursive: true });
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      err = '';
+      const before = await readConfig();
+      const code = await main(['add', other, '--alias', 'work'], deps());
+      expect(code).not.toBe(0);
+      expect(err).toContain('alias already in use');
+      const after = await readConfig();
+      expect(after.folders).toEqual(before.folders);
+    });
   });
 
   describe('list', () => {
@@ -135,6 +163,15 @@ describe('folders.main', () => {
       expect(parsed.folders).toHaveLength(1);
       expect(parsed.folders[0]!.path).toBe(skillDir);
     });
+
+    it('shows an ALIAS column with the alias value', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['list'], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('ALIAS');
+      expect(out).toContain('work');
+    });
   });
 
   describe('remove', () => {
@@ -152,6 +189,67 @@ describe('folders.main', () => {
       const code = await main(['remove', skillDir], deps());
       expect(code).not.toBe(0);
       expect(err).toContain('no registered folder matches');
+    });
+
+    it('removes the same folder when given its alias', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['remove', 'work'], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('Removed folder');
+      const config = await readConfig();
+      expect(config.folders).toHaveLength(0);
+    });
+  });
+
+  describe('alias', () => {
+    it('sets an alias on a registered folder by path', async () => {
+      await main(['add', skillDir], deps());
+      out = '';
+      const code = await main(['alias', skillDir, 'work'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('work');
+    });
+
+    it('changes an existing alias when addressed by the old alias', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['alias', 'work', 'review'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('review');
+    });
+
+    it('returns exit 1 when no folder matches', async () => {
+      const code = await main(['alias', skillDir, 'work'], deps());
+      expect(code).toBe(1);
+      expect(err).toContain('no registered folder matches');
+    });
+
+    it('returns exit 2 for a non-kebab-case alias', async () => {
+      await main(['add', skillDir], deps());
+      err = '';
+      const code = await main(['alias', skillDir, 'Bad_Name'], deps());
+      expect(code).toBe(2);
+      expect(err).toContain('invalid alias');
+    });
+
+    it('returns exit 2 for a duplicate alias', async () => {
+      const other = join(tmpRoot, 'skills-3');
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(other, { recursive: true });
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      await main(['add', other], deps());
+      err = '';
+      const code = await main(['alias', other, 'work'], deps());
+      expect(code).toBe(2);
+      expect(err).toContain('alias already in use');
+    });
+
+    it('returns exit 2 when <name> is missing', async () => {
+      const code = await main(['alias', skillDir], deps());
+      expect(code).toBe(2);
     });
   });
 

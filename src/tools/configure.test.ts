@@ -189,6 +189,32 @@ describe('handleConfigure — add_folder', () => {
     const result = await handleConfigure(deps, { action: 'add_folder', folder: '/plain/path' });
     expect(result.conflictHint).toBeUndefined();
   });
+
+  it('persists an alias when one is provided', async () => {
+    const { store, saved } = makeFakeStore();
+    const deps = makeDeps({ store, folders: [] });
+    await handleConfigure(deps, { action: 'add_folder', folder: '/new/path', alias: 'work' });
+    const entry = saved[0]!.folders.find((f) => f.path === resolve('/new/path'));
+    expect(entry?.alias).toBe('work');
+  });
+
+  it('throws when the alias is already in use by another folder', async () => {
+    const { store } = makeFakeStore({
+      folders: [{ path: '/existing', priority: 100, enabled: true, tags: [], alias: 'work' }],
+    });
+    const deps = makeDeps({ store, folders: ['/existing'] });
+    await expect(
+      handleConfigure(deps, { action: 'add_folder', folder: '/new/path', alias: 'work' }),
+    ).rejects.toThrow('alias already in use');
+  });
+
+  it('throws for a non-kebab-case alias', async () => {
+    const { store } = makeFakeStore();
+    const deps = makeDeps({ store, folders: [] });
+    await expect(
+      handleConfigure(deps, { action: 'add_folder', folder: '/new/path', alias: 'Bad_Alias' }),
+    ).rejects.toThrow('invalid alias');
+  });
 });
 
 describe('handleConfigure — remove_folder', () => {

@@ -6,6 +6,12 @@ const folderEntrySchema = z.object({
   priority: z.number().int().default(100),
   enabled: z.boolean().default(true),
   tags: z.array(z.string()).default([]),
+  // Optional kebab-case handle to address the folder from the CLI. Optional
+  // so configs written before this field still validate.
+  alias: z
+    .string()
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+    .optional(),
 });
 
 const securitySchema = z.object({
