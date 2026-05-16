@@ -14,7 +14,7 @@
  *   skillforge folders reset --yes                 Reset folders to default
  *
  * add flags:
- *   --priority <n>     Folder priority (default 100, lower wins ordering).
+ *   --priority <n>     Folder priority (default 100; higher wins on name collisions).
  *   --tags <a,b,c>     Comma-separated tags.
  *   --disabled         Register the folder disabled.
  */
