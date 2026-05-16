@@ -1,13 +1,13 @@
 # SkillForge MCP — Marketing Copy Drafts
 
-Pre-written launch copy for the v1.0.0 announcement. Each file is platform-tuned and ready to copy-paste; rewrite freely before posting if voice or angle needs adjusting.
+Pre-written launch copy for the v1.3.0 announcement. Each file is platform-tuned and ready to copy-paste; rewrite freely before posting if voice or angle needs adjusting.
 
 | File | Platform | Tone | Length |
 |------|----------|------|--------|
 | `twitter-thread.md` | Twitter / X | Punchy, technical-but-accessible | 8 tweets ≤ 280 chars each + reply-ready Q&A |
-| `linkedin-post.md` | LinkedIn | Professional, long-form, problem-first | ~1400 chars |
+| `linkedin-post.md` | LinkedIn | Professional, long-form, problem-first | ~1500 chars |
 | `reddit-posts.md` | r/ClaudeAI, r/LocalLLaMA, r/SaaS | One variant per subreddit, audience-tuned | Variable per post |
-| `show-hn.md` | Hacker News | Understated, technical specifics, design-decision focus | Title + URL + ~600-word first comment |
+| `show-hn.md` | Hacker News | Understated, technical specifics, design-decision focus | Title + URL + ~700-word first comment |
 
 ## Posting order recommendation
 
@@ -28,7 +28,7 @@ For every variant:
 - [ ] Links resolve: GitHub repo, npm package (after publish), marketplace catalog, docs files.
 - [ ] Brand consistency: public-facing brand is **Lyu Pro**. Internal project codenames are never mentioned in launch copy.
 - [ ] No internal-only references (plan section numbers, OMC, internal stage numbering — those live in private docs, not the launch copy).
-- [ ] Test count and gate numbers reflect the **actual** v1.0.0 release (370 / 46 files / 7 docs).
+- [ ] Test count and gate numbers reflect the **actual** v1.3.0 release (561 tests / 61 files / 7 docs).
 - [ ] The line "MIT licensed" appears in every variant.
 
 ## Out of scope for this file

@@ -1,4 +1,4 @@
-# Reddit Posts — SkillForge MCP v1.0.0 Launch
+# Reddit Posts — SkillForge MCP v1.3.0 Launch
 
 One post per subreddit. Tone tuned per audience. Each variant has its own title + body so they can be posted independently without coming across as cross-post spam.
 
@@ -10,7 +10,7 @@ One post per subreddit. Tone tuned per audience. Each variant has its own title 
 
 **Body:**
 
-I just shipped v1.0.0 of SkillForge MCP and wanted to share it with the Claude Code community since most early dogfooding will happen here.
+I just shipped v1.3.0 of SkillForge MCP and wanted to share it with the Claude Code community since most early dogfooding will happen here.
 
 **The pain I ran into:** Claude Code auto-loads every skill in `~/.claude/skills/` on every cold start. With 100+ skills, that's thousands of tokens burned on metadata before the user types a prompt. Codex CLI, Cursor, and other MCP-capable tools have their own skill formats — so team-shared bundles end up duplicated across multiple folder structures.
 
@@ -21,13 +21,16 @@ I just shipped v1.0.0 of SkillForge MCP and wanted to share it with the Claude C
 - Composite skills via `skills: [a, b, c]` frontmatter with cycle detection.
 - Multi-folder cascade with priority, blacklist filter, hot reload via chokidar.
 - Honest security model: scripts double opt-in (config + frontmatter), env-whitelisted sandbox, AbortSignal kill on timeout. `docs/SECURITY.md` documents out-of-scope items too.
-- 370/370 tests passing, 46 files all ≤ 400 lines.
+- 561/561 tests passing, 61 files all ≤ 400 lines.
+- One-command installer wires Claude Code, Codex CLI, and Cursor in a single shot.
+- `skillforge folders` CLI — manage folders from the terminal with aliases, enable/disable, and tag filters.
+- Installable as a Claude Code plugin via `claude plugin install`.
 
 **Install:**
 
 ```
-claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
-skills__configure { action: "add_folder", folder: "/abs/path/to/your/skills" }
+npx -y @lyupro/skillforge-mcp install --all
+skillforge folders add /abs/path/to/your/skills --alias core
 skills__list
 ```
 
@@ -44,9 +47,9 @@ Issues / feedback most welcome — solo-built, MIT licensed.
 
 **Body:**
 
-Built and released SkillForge MCP v1.0.0 — a generic MCP server that loads Markdown skills from arbitrary folders. Wanted to share here because the cross-tool angle should be interesting to anyone running local LLM tooling.
+Built and released SkillForge MCP v1.3.0 — a generic MCP server that loads Markdown skills from arbitrary folders. Wanted to share here because the cross-tool angle should be interesting to anyone running local LLM tooling.
 
-**The technical angle:** It's a stdio MCP server (Node ≥ 20, TypeScript ESM) using the official `@modelcontextprotocol/sdk`. Skills are Markdown files with YAML frontmatter. The server exposes five tools (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) and works with any client that speaks MCP — Claude Code, Codex CLI, Cursor, or a custom client you build on `@modelcontextprotocol/sdk`.
+**The technical angle:** It's a stdio MCP server (Node ≥ 20, TypeScript ESM) using the official `@modelcontextprotocol/sdk`. Skills are Markdown files with YAML frontmatter. The server exposes five tools (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) and works with any client that speaks MCP — Claude Code, Codex CLI, Cursor (`~/.cursor/mcp.json`), or a custom client you build on `@modelcontextprotocol/sdk`.
 
 **Architecture:**
 - 9 documented design patterns inline: Registry, Strategy, Factory, Adapter, Decorator, Composite, Observer, OCP, DI.
@@ -65,20 +68,27 @@ Built and released SkillForge MCP v1.0.0 — a generic MCP server that loads Mar
 - AbortSignal kill on timeout.
 - PatternScanner audit blocks skills with known-dangerous regex matches before they reach the registry.
 
+**CLI surface (v1.2+):**
+- `skillforge install --all` — one command wires Claude Code, Codex CLI, and Cursor in a single shot.
+- `skillforge tools` — inspect the MCP tool surface from the terminal.
+- `skillforge folders` — manage skill folders without an LLM session: add/remove, enable/disable, set aliases, filter by tag.
+- Folder tag filter: `skills__list folderTag` or `folders list --tag` scopes results to folders carrying a given label.
+
 **Engineering:**
-- 370 / 370 tests passing + 1 win32-skip.
-- 46 source files all ≤ 400 lines, enforced via pre-commit hook.
+- 561 / 561 tests passing + 1 win32-skip.
+- 61 source files all ≤ 400 lines, enforced via pre-commit hook.
 - TypeScript ESM, MIT licensed.
 
 **Install:**
 
 ```
+# One-command installer (after npm publish)
+npx -y @lyupro/skillforge-mcp install --all
+
+# Or from source
 git clone https://github.com/lyupro/skillforge-mcp.git
 cd skillforge-mcp && pnpm install && pnpm build
-# Codex
-codex mcp add skillforge -- node /abs/path/to/dist/server.js
-# Or via npx after npm publish
-claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
+node dist/cli/dispatcher.js serve
 ```
 
 Repo: `github.com/lyupro/skillforge-mcp`. Docs include INSTALL, SKILL_FORMAT, CONFIGURATION, ARCHITECTURE, SECURITY, and per-tool integration guides.
@@ -89,7 +99,7 @@ Happy to answer questions about the MCP server side, the sandbox approach, or ho
 
 ## r/SaaS
 
-**Title:** Built and shipped a developer-tools MCP server v1.0.0 — open source, solo founder, AMA
+**Title:** Built and shipped a developer-tools MCP server v1.3.0 — open source, solo founder, AMA
 
 **Body:**
 
@@ -99,19 +109,21 @@ So I built SkillForge MCP — a single Model Context Protocol server that loads 
 
 **Stage gate decisions worth sharing:**
 
-- v1.0.0 is fully open source (MIT). Monetisation is downstream — paid plugins / hosted skill registry come later, only if there's pull. Building reputation first beats building a paywall first.
-- Solo dev, zero VC, three weeks total from blank repo to v1.0.0 with 7 docs files and 10 sample skills.
-- The marketing surface for v1.0.0 is intentionally narrow: open source first, dogfood on the internal pipeline next, paid surface only after consumer feedback shapes the metering model. CostDecorator is deferred for that reason — no half-finished metering surface ships.
+- v1.3.0 is fully open source (MIT). Monetisation is downstream — paid plugins / hosted skill registry come later, only if there's pull. Building reputation first beats building a paywall first.
+- Solo dev, zero VC. Shipped from blank repo through v1.3.0 covering install ergonomics, terminal CLI, Claude plugin packaging, and folder management tooling.
+- The marketing surface is intentionally narrow: open source first, dogfood on the internal pipeline next, paid surface only after consumer feedback shapes the metering model. CostDecorator is deferred for that reason — no half-finished metering surface ships.
 
-**What landed in v1.0.0:**
+**What has landed across v1.0–v1.3:**
 - 5 MCP tools, 3 strategies, 3 decorators, composite skills, multi-folder cascade.
-- 10 production-quality sample skills.
-- 7 docs files including a documented threat model.
-- 370 / 370 tests passing.
+- 10 production-quality sample skills, 7 docs files including a documented threat model.
+- One-command cross-tool installer (`skillforge install --all`).
+- Terminal `skillforge folders` CLI with aliases, enable/disable, and tag filter.
+- Claude Code plugin packaging.
+- 561 / 561 tests passing.
 
 **What I'd love feedback on (SaaS angle):**
 - Is "free open source MCP server + paid hosted skill registry" a defensible v2 model, or does the open-core dynamic kill it?
 - For solo founders shipping dev tools — landing page first, npm publish first, or marketplace listing first?
-- Anyone running autonomous mobile-app pipelines? Curious what your skill/prompt-template surface looks like.
+- Anyone running autonomous LLM-agent pipelines? Curious what your skill/prompt-template surface looks like.
 
 Repo: `github.com/lyupro/skillforge-mcp`. AMA in comments.

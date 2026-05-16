@@ -1,10 +1,10 @@
-# LinkedIn Post — SkillForge MCP v1.0.0 Launch
+# LinkedIn Post — SkillForge MCP v1.3.0 Launch
 
-Professional-flavoured launch post. ~1400 characters. Lead with the problem, end with a call to feedback rather than a hard sell. LinkedIn rewards thoughtful long-form over hype.
+Professional-flavoured launch post. ~1500 characters. Lead with the problem, end with a call to feedback rather than a hard sell. LinkedIn rewards thoughtful long-form over hype.
 
 ---
 
-**Shipped: SkillForge MCP v1.0.0 — a universal Markdown-skills server for any MCP-capable LLM tool.**
+**Shipped: SkillForge MCP v1.3.0 — a universal Markdown-skills server for any MCP-capable LLM tool.**
 
 Every developer using an LLM coding assistant runs into the same pain at scale: each tool ships its own skill format. Claude Code has SKILL.md. Codex has its own TOML-flavoured shape. Cursor adds a third manifest style. Team-shared skill bundles end up duplicated across `~/.claude/`, `~/.codex/`, project repos, and pastebin gists.
 
@@ -19,15 +19,23 @@ SkillForge MCP solves both pains with one Model Context Protocol server:
 — Composite skills: `skills: [a, b, c]` walks nested skills sequentially with cycle detection.
 — Honest security model: scripts opt-in twice (config + frontmatter), env-whitelisted sandbox, AbortSignal-based kill on timeout. Threat model documents what is NOT covered too.
 
-Engineering snapshot: 370 tests passing, 46 source files all ≤ 400 lines, TypeScript ESM on Node ≥ 20, MIT licensed.
+What has landed across v1.1–v1.3:
 
-What ships in 1.0.0: five MCP tools, three strategies, three decorators (logging / timeout / cache), 10 production-quality sample skills, 5 worked configs, seven docs files (INSTALL / SKILL_FORMAT / CONFIGURATION / ARCHITECTURE / SECURITY / four INTEGRATION guides).
+— One-command cross-tool installer: `npx -y @lyupro/skillforge-mcp install --all` wires Claude Code, Codex CLI, and Cursor (`~/.cursor/mcp.json`) in a single shot.
+— Terminal `skillforge folders` CLI — manage skill folders from the shell without opening an LLM session: add, remove, enable/disable, set aliases, filter by tag.
+— Claude Code plugin packaging — installable via `claude plugin install` or the `/plugins` UI.
+— Folder ergonomics: short kebab-case aliases (`--alias work`), an enable/disable toggle, and a tag filter (`skills__list folderTag`, `folders list --tag`) for grouping folders by category.
+
+Engineering snapshot: 561 tests passing, 61 source files all ≤ 400 lines, TypeScript ESM on Node ≥ 20, MIT licensed.
 
 Install (after npm publish):
-`claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp`
+`npx -y @lyupro/skillforge-mcp install --all`
+
+Then register a folder from the terminal:
+`skillforge folders add /abs/path/to/skills --alias core`
 
 Open source, repo on GitHub: github.com/lyupro/skillforge-mcp
-Maintainer: Lyu Pro — built solo, alongside an internal autonomous mobile-app pipeline that will be the first dogfood consumer.
+Maintainer: Lyu Pro — built solo, alongside an internal autonomous mobile-app pipeline that is the first dogfood consumer.
 
 Feedback, issues, and PRs welcome. If you maintain a multi-LLM-tool dev workflow and want to consolidate skill bundles, I would love to hear what worked or did not.
 

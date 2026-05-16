@@ -1,4 +1,4 @@
-# Twitter / X Thread — SkillForge MCP v1.0.0 Launch
+# Twitter / X Thread — SkillForge MCP v1.3.0 Launch
 
 Draft for `@lyupro` (or whichever Lyu Pro brand handle ships). 8 tweets, each ≤ 280 characters. Plain text — Twitter strips Markdown. Hashtag block kept short to leave room for body.
 
@@ -6,7 +6,7 @@ Draft for `@lyupro` (or whichever Lyu Pro brand handle ships). 8 tweets, each �
 
 ## Tweet 1 / 8 — Hook
 
-> Just shipped SkillForge MCP v1.0.0.
+> Just shipped SkillForge MCP v1.3.0.
 >
 > One MCP server. Markdown skills from any folder. Cross-tool: Claude Code, Codex CLI, Cursor, custom clients.
 >
@@ -14,7 +14,7 @@ Draft for `@lyupro` (or whichever Lyu Pro brand handle ships). 8 tweets, each �
 >
 > Open source, MIT. Thread 🧵
 
-**Length:** 252 chars.
+**Length:** 253 chars.
 
 ---
 
@@ -78,28 +78,27 @@ Draft for `@lyupro` (or whichever Lyu Pro brand handle ships). 8 tweets, each �
 
 > Install in 60 seconds:
 >
-> ```
-> claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
-> skills__configure { action: "add_folder", folder: "/your/skills" }
-> skills__list
-> ```
+> npx -y @lyupro/skillforge-mcp install --all
 >
-> Same flow for Codex CLI (TOML) and Cursor (settings.json). One server, three tools.
+> Wires Claude Code, Codex CLI, and Cursor (~/.cursor/mcp.json) in one shot. Then add a folder:
+>
+> skillforge folders add ~/skills --alias core
+> skills__list
 
-**Length:** 270 chars (counting code-block as plain text on Twitter).
+**Length:** 221 chars.
 
 ---
 
 ## Tweet 8 / 8 — CTA
 
-> v1.0.0 ships with 10 production-quality sample skills, 5 worked configs, 7 docs files, 370/370 tests passing.
+> v1.3.0: 561/561 tests, 10 sample skills, 7 docs. v1.1: one-command install --all. v1.2: terminal folders CLI + Claude plugin. v1.3: folder aliases, enable/disable, tag filter.
 >
-> 🔗 Repo + install + docs: github.com/lyupro/skillforge-mcp
-> 📦 npm: @lyupro/skillforge-mcp
+> 🔗 github.com/lyupro/skillforge-mcp
+> 📦 @lyupro/skillforge-mcp
 >
-> Built solo by Lyu Pro. Feedback welcome — issues open.
+> Built solo by Lyu Pro. Issues open.
 
-**Length:** 268 chars.
+**Length:** 273 chars.
 
 ---
 
@@ -117,13 +116,16 @@ Pre-canned answers for common replies. Drop into thread as one-off replies when 
 A: Native auto-loads everything in ~/.claude/skills/ on cold start (eager). SkillForge stays lazy — metadata-only via skills__list, body on skills__invoke. Disable native auto-load when SkillForge serves the same folder to avoid double-work.
 
 **Q: Does it work without Anthropic CLI?**
-A: Yes — it's a generic MCP server. Works with Codex CLI, Cursor (settings.json MCP block), and any custom client built on @modelcontextprotocol/sdk.
+A: Yes — it's a generic MCP server. Works with Codex CLI, Cursor (~/.cursor/mcp.json mcpServers block), and any custom client built on @modelcontextprotocol/sdk.
 
 **Q: Scripts seem scary — what stops malicious skills?**
 A: Three layers: (1) config.security.allowScripts is false by default; (2) frontmatter must opt in too (`allowScripts: true`); (3) PatternScanner audits skill content against a configurable regex list before loading. See docs/SECURITY.md.
 
 **Q: Can I share skills across a team?**
-A: Yes — point SkillForge at a shared folder (Dropbox / Git submodule / SMB / network drive). Multi-folder cascade with priority handles conflicts.
+A: Yes — point SkillForge at a shared folder (Dropbox / Git submodule / SMB / network drive). Multi-folder cascade with priority handles conflicts. Use `--alias` to give each folder a short name.
+
+**Q: What's in v1.3?**
+A: Folder aliases (address a folder by short name in all CLI commands), enable/disable toggle (no need to remove + re-add), and a tag filter — `skills__list folderTag` or `folders list --tag` to scope skills to a labelled group.
 
 **Q: Roadmap?**
-A: Internal pipeline integration (dogfood track). Cross-tool verification matrix. Future: CostDecorator once consumer feedback shapes the metering surface. PRs welcome.
+A: Production dogfood on an internal autonomous pipeline. Cross-tool verification matrix. Future: CostDecorator once consumer feedback shapes the metering surface. PRs welcome.
