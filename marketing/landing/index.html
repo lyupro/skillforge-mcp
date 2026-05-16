@@ -82,6 +82,16 @@
     .sfm-skill-chip strong { display: block; font-size: .95rem; margin-bottom: 4px; }
     .sfm-skill-chip span { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
+    /* Changelog */
+    .sfm-changelog { font-size: .95rem; }
+    .sfm-changelog h3 { font-size: 1.2rem; font-weight: 700; color: var(--fg); margin: 0 0 4px; }
+    .sfm-changelog h4 { font-size: .95rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin: 20px 0 8px; }
+    .sfm-changelog ul { margin: 0 0 8px; padding-left: 20px; }
+    .sfm-changelog li { color: var(--muted); margin-bottom: 6px; line-height: 1.55; }
+    .sfm-changelog li code { font-size: .85em; }
+    .sfm-changelog .sfm-cl-meta { color: var(--muted); font-size: .85rem; margin: 0 0 16px; }
+    .sfm-changelog .sfm-cl-more { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: .9rem; }
+
     /* Footer */
     .sfm-footer { padding: 48px 0; text-align: center; color: var(--muted); font-size: .9rem; border-top: 1px solid var(--border); }
     .sfm-footer a { margin: 0 8px; }
@@ -107,6 +117,18 @@
       </div>
     </div>
   </header>
+
+  <!-- =================== WHAT'S NEW =================== -->
+  <section class="sfm-section" id="sfm-whats-new">
+    <div class="container">
+      <h2>What's new</h2>
+      <p class="lead">Latest release, pulled live from the changelog.</p>
+      <div class="sfm-changelog" id="sfm-changelog-body">
+        <!-- filled by JS; fallback content below stays if fetch fails -->
+        <p><a href="https://github.com/lyupro/skillforge-mcp/blob/master/CHANGELOG.md">View the full changelog on GitHub →</a></p>
+      </div>
+    </div>
+  </section>
 
   <!-- =================== PAIN =================== -->
   <section class="sfm-section sfm-pain">
@@ -334,6 +356,100 @@ args = ["-y", "@lyupro/skillforge-mcp", "serve"]
         })
         .catch(function () { /* network error — keep hardcoded fallback text */ });
     } catch (_) { /* fetch not available (e.g. very old browser) — silent */ }
+  })();
+
+  // Changelog renderer — fetches CHANGELOG.md, slices the latest entry, renders it.
+  // No external libs. Escapes raw text before applying inline formatting.
+  (function () {
+    var CHANGELOG_URL = 'https://raw.githubusercontent.com/lyupro/skillforge-mcp/master/CHANGELOG.md';
+    var FULL_URL = 'https://github.com/lyupro/skillforge-mcp/blob/master/CHANGELOG.md';
+    var FALLBACK_LINK = '<p class="sfm-cl-more"><a href="' + FULL_URL + '">View the full changelog on GitHub →</a></p>';
+
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function inlineFmt(s) {
+      // Applied to already-escaped text — only emit known-safe tags.
+      return s
+        // `code`
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // **bold**
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        // [text](url) — url already escaped via escHtml, safe to emit as href
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    }
+
+    function renderEntry(text) {
+      var lines = text.split('\n');
+      var html = '';
+      var inList = false;
+
+      for (var i = 0; i < lines.length; i++) {
+        var raw = lines[i];
+        var line = raw.trimEnd();
+
+        if (line === '') {
+          if (inList) { html += '</ul>\n'; inList = false; }
+          continue;
+        }
+
+        // ## [x.y.z] — date  (the entry heading itself)
+        if (/^## \[/.test(line)) {
+          if (inList) { html += '</ul>\n'; inList = false; }
+          // Split off the date part after ' — '
+          var dashIdx = line.indexOf(' — ');
+          var heading = dashIdx !== -1 ? line.slice(3, dashIdx) : line.slice(3);
+          var date    = dashIdx !== -1 ? line.slice(dashIdx + 3) : '';
+          html += '<h3>' + inlineFmt(escHtml(heading)) + '</h3>\n';
+          if (date) html += '<p class="sfm-cl-meta">' + escHtml(date) + '</p>\n';
+          continue;
+        }
+
+        // ### Sub-heading (Added / Changed / Fixed / Verified …)
+        if (/^### /.test(line)) {
+          if (inList) { html += '</ul>\n'; inList = false; }
+          html += '<h4>' + escHtml(line.slice(4)) + '</h4>\n';
+          continue;
+        }
+
+        // - list item
+        if (/^- /.test(line)) {
+          if (!inList) { html += '<ul>\n'; inList = true; }
+          html += '<li>' + inlineFmt(escHtml(line.slice(2))) + '</li>\n';
+          continue;
+        }
+
+        // Plain paragraph text (e.g. the release summary line)
+        if (inList) { html += '</ul>\n'; inList = false; }
+        html += '<p class="sfm-cl-meta">' + inlineFmt(escHtml(line)) + '</p>\n';
+      }
+
+      if (inList) html += '</ul>\n';
+      return html;
+    }
+
+    function sliceLatestEntry(text) {
+      var start = text.indexOf('\n## [');
+      if (start === -1) return null;
+      start += 1; // skip the leading \n
+      var next = text.indexOf('\n## [', start + 4);
+      return next === -1 ? text.slice(start) : text.slice(start, next);
+    }
+
+    try {
+      fetch(CHANGELOG_URL)
+        .then(function (res) { return res.ok ? res.text() : Promise.reject(res.status); })
+        .then(function (text) {
+          var entry = sliceLatestEntry(text);
+          if (!entry) return;
+          var rendered = renderEntry(entry.trim());
+          if (!rendered) return;
+          var el = document.getElementById('sfm-changelog-body');
+          if (el) el.innerHTML = rendered + FALLBACK_LINK;
+        })
+        .catch(function () { /* keep fallback link */ });
+    } catch (_) { /* fetch unavailable — keep fallback */ }
   })();
 
   // Install tabs
