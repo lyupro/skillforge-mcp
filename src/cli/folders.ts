@@ -29,6 +29,8 @@ import { defaultIsDirectory } from './folders-shared.js';
 import {
   handleAdd,
   handleAlias,
+  handleDisable,
+  handleEnable,
   handleList,
   handleRemove,
   handleReset,
@@ -56,6 +58,8 @@ Actions:
   remove <path|alias>        Remove the entry for <path> or its alias.
   alias <path|alias> <name>  Set or change the alias of a registered folder.
                                <name> must be kebab-case and unique.
+  enable <path|alias>        Enable a previously disabled folder.
+  disable <path|alias>       Disable a folder without removing it.
   reset --yes                Reset folders to the default (empty) list.
                                Without --yes, prints what would happen and exits.
 
@@ -64,6 +68,8 @@ Examples:
   skillforge folders add ~/.lyupro/skills --priority 50 --tags work,review --alias work
   skillforge folders remove work
   skillforge folders alias ~/.lyupro/skills work
+  skillforge folders disable work
+  skillforge folders enable work
   skillforge folders reset --yes
 `;
 
@@ -92,6 +98,10 @@ export async function main(rawArgv: string[], deps: FoldersDeps = {}): Promise<n
         return await handleRemove(store, rest, stdout, stderr);
       case 'alias':
         return await handleAlias(store, rest, stdout, stderr);
+      case 'enable':
+        return await handleEnable(store, rest, stdout, stderr);
+      case 'disable':
+        return await handleDisable(store, rest, stdout, stderr);
       case 'reset':
         return await handleReset(store, rest, stdout, stderr);
       default: {

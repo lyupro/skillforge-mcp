@@ -253,6 +253,49 @@ describe('folders.main', () => {
     });
   });
 
+  describe('enable / disable', () => {
+    it('disable sets enabled: false in config', async () => {
+      await main(['add', skillDir], deps());
+      out = '';
+      const code = await main(['disable', skillDir], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('Disabled folder');
+      const config = await readConfig();
+      expect((config.folders[0] as { enabled: boolean }).enabled).toBe(false);
+    });
+
+    it('enable sets enabled: true after a disable', async () => {
+      await main(['add', skillDir, '--disabled'], deps());
+      out = '';
+      const code = await main(['enable', skillDir], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('Enabled folder');
+      const config = await readConfig();
+      expect((config.folders[0] as { enabled: boolean }).enabled).toBe(true);
+    });
+
+    it('disable by alias works', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['disable', 'work'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect((config.folders[0] as { enabled: boolean }).enabled).toBe(false);
+    });
+
+    it('enable non-existent path returns exit 1', async () => {
+      const code = await main(['enable', skillDir], deps());
+      expect(code).toBe(1);
+      expect(err).toContain('no registered folder matches');
+    });
+
+    it('disable non-existent alias returns exit 1', async () => {
+      const code = await main(['disable', 'ghost'], deps());
+      expect(code).toBe(1);
+      expect(err).toContain('no registered folder matches');
+    });
+  });
+
   describe('reset', () => {
     it('without --yes does not change the config', async () => {
       await main(['add', skillDir], deps());

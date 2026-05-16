@@ -160,6 +160,52 @@ export async function handleAlias(
   return 0;
 }
 
+export async function handleEnable(
+  store: ConfigStore,
+  rest: string[],
+  stdout: (t: string) => void,
+  stderr: (t: string) => void,
+): Promise<number> {
+  const token = rest[0];
+  if (token === undefined || token.startsWith('--')) {
+    stderr(`skillforge folders enable: missing <path|alias>\n`);
+    return 2;
+  }
+  const config = await store.load();
+  const entry = findFolderEntry(config.folders, token);
+  if (entry === null) {
+    stderr(`skillforge folders enable: no registered folder matches: ${token}\n`);
+    return 1;
+  }
+  entry.enabled = true;
+  await store.save(config);
+  stdout(`Enabled folder: ${entry.path}\n`);
+  return 0;
+}
+
+export async function handleDisable(
+  store: ConfigStore,
+  rest: string[],
+  stdout: (t: string) => void,
+  stderr: (t: string) => void,
+): Promise<number> {
+  const token = rest[0];
+  if (token === undefined || token.startsWith('--')) {
+    stderr(`skillforge folders disable: missing <path|alias>\n`);
+    return 2;
+  }
+  const config = await store.load();
+  const entry = findFolderEntry(config.folders, token);
+  if (entry === null) {
+    stderr(`skillforge folders disable: no registered folder matches: ${token}\n`);
+    return 1;
+  }
+  entry.enabled = false;
+  await store.save(config);
+  stdout(`Disabled folder: ${entry.path}\n`);
+  return 0;
+}
+
 export async function handleReset(
   store: ConfigStore,
   rest: string[],
