@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { resolve } from 'node:path';
 import type { ServerDeps } from '../server-deps.js';
-import type { PersistedConfig } from '../config/index.js';
 import { defaultConfig } from '../config/index.js';
 import { loadResolvedConfig } from '../config.js';
-import { ensureRegistryFresh } from './loader.js';
+import { reconcileFolders } from '../reconcile.js';
 import {
   detectSkillSourceConflict,
   formatConflictHint,
@@ -47,23 +46,6 @@ export interface ConfigureResult {
   conflictHint?: string;
 }
 
-/** Recompute resolved folders from env + persisted config, then splice deps.folders in place. */
-async function reconcileFolders(deps: ServerDeps): Promise<PersistedConfig> {
-  const persisted = await deps.configStore.load();
-  const resolved = await loadResolvedConfig(process.env, deps.configStore);
-  // Splice in-place so all references to deps.folders see the new list.
-  deps.folders.splice(0, deps.folders.length, ...resolved.folders);
-  deps.blacklistFilter.setManualBlacklist(persisted.blacklist);
-  deps.metadataCache.invalidate();
-  try {
-    await deps.folderWatcher.setFolders(deps.folders);
-  } catch (err) {
-    console.error(`[skillforge:configure] watcher setFolders failed: ${String(err)}`);
-  }
-  await ensureRegistryFresh(deps);
-  return persisted;
-}
-
 export async function handleConfigure(
   deps: ServerDeps,
   args: { action: ConfigureAction; folder?: string; alias?: string; blacklist?: string[] },
@@ -72,19 +54,19 @@ export async function handleConfigure(
 
   try {
     if (action === 'list_folders') {
-      const persisted = await deps.configStore.load();
+      const resolved = await loadResolvedConfig(process.env, deps.configStore);
       return {
-        folders: [...deps.folders],
-        blacklist: persisted.blacklist,
+        folders: resolved.folders,
+        blacklist: resolved.persisted.blacklist,
         totalSkills: deps.registry.size,
       };
     }
 
     if (action === 'get_blacklist') {
-      const persisted = await deps.configStore.load();
+      const resolved = await loadResolvedConfig(process.env, deps.configStore);
       return {
-        folders: [...deps.folders],
-        blacklist: persisted.blacklist,
+        folders: resolved.folders,
+        blacklist: resolved.persisted.blacklist,
         totalSkills: deps.registry.size,
       };
     }
@@ -119,7 +101,7 @@ export async function handleConfigure(
       // Why: always save even on no-op — simpler than branching, atomic write is cheap.
       await deps.configStore.save(persisted);
       const finalPersisted = await reconcileFolders(deps);
-      const conflict = detectSkillSourceConflict(absPath);
+      const conflict = await detectSkillSourceConflict(absPath);
       return {
         folders: [...deps.folders],
         blacklist: finalPersisted.blacklist,

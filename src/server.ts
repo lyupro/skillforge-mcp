@@ -10,7 +10,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadResolvedConfig, buildPatternScanner } from './config.js';
 import { ConfigStore, defaultConfigPath } from './config/index.js';
-import { FolderWatcher } from './watcher/index.js';
+import { FolderWatcher, ConfigWatcher } from './watcher/index.js';
+import { reconcileFolders } from './reconcile.js';
+import { startRuntime, registerShutdown } from './runtime.js';
 import {
   SkillRegistry,
   SkillResolver,
@@ -155,6 +157,23 @@ export async function buildDeps(): Promise<ServerDeps> {
     onBatch: () => metadataCache.invalidate(),
   });
 
+  // The config CLI runs as a separate process and rewrites config.json on disk.
+  // This watcher reconciles a running server with those out-of-process edits.
+  // `deps` is assigned at the end of buildDeps; the closure runs only after start().
+  let deps: ServerDeps;
+  const configWatcher = new ConfigWatcher({
+    configPath: defaultConfigPath(),
+    onChange: async () => {
+      try {
+        await reconcileFolders(deps);
+      } catch (err) {
+        console.error(
+          `[skillforge:config-watcher] reconcile failed, skipping event: ${String(err)}`,
+        );
+      }
+    },
+  });
+
   const logger = stderrLogger;
   const sandboxRunner = new SandboxRunner({ logger });
   // allowScripts flag captured from initial config load. A ref object is used
@@ -183,7 +202,7 @@ export async function buildDeps(): Promise<ServerDeps> {
     cacheMaxEntries: invocation.cacheMaxEntries,
   });
 
-  return {
+  deps = {
     folders: resolved.folders,
     configStore,
     registry: new SkillRegistry(),
@@ -195,23 +214,20 @@ export async function buildDeps(): Promise<ServerDeps> {
     factory,
     blacklistFilter,
     folderWatcher,
+    configWatcher,
     logger,
     sandboxRunner,
     decoratorChain,
   };
+  return deps;
 }
 
 async function main(): Promise<void> {
   const deps = await buildDeps();
   const server = buildServer(deps);
   await server.connect(new StdioServerTransport());
-  await deps.folderWatcher.start();
-
-  const shutdown = async () => {
-    await deps.folderWatcher.stop();
-  };
-  process.once('SIGTERM', () => { void shutdown(); });
-  process.once('SIGINT', () => { void shutdown(); });
+  await startRuntime(deps);
+  registerShutdown(deps);
 }
 
 // Only run main() when invoked directly, not when imported by tests.

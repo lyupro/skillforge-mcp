@@ -3,7 +3,7 @@ import type { FrontmatterParser, FileScanner } from './parser/index.js';
 import type { StrategyFactory } from './factory/index.js';
 import type { BlacklistFilter } from './security/index.js';
 import type { ConfigStore } from './config/index.js';
-import type { FolderWatcher } from './watcher/index.js';
+import type { FolderWatcher, ConfigWatcher } from './watcher/index.js';
 import type { Logger } from './decorators/index.js';
 import type { SandboxRunner } from './security/sandbox-runner.js';
 import type { DecoratorChain } from './decorators/index.js';
@@ -22,6 +22,8 @@ export interface ServerDeps {
   factory: StrategyFactory;
   blacklistFilter: BlacklistFilter;
   folderWatcher: FolderWatcher;
+  /** Watches config.json for out-of-process edits (e.g. the folders CLI). */
+  configWatcher: ConfigWatcher;
   logger: Logger;
   sandboxRunner: SandboxRunner;
   decoratorChain: DecoratorChain;

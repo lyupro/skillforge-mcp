@@ -69,6 +69,7 @@ function makeDeps(overrides: Partial<{
     factory: new StrategyFactory([new PromptStrategy()]),
     blacklistFilter: overrides.blacklistFilter ?? new BlacklistFilter(),
     folderWatcher: {} as ServerDeps['folderWatcher'],
+    configWatcher: {} as ServerDeps['configWatcher'],
     logger: stderrLogger,
     sandboxRunner: new SandboxRunner({}),
     decoratorChain: new DecoratorChain({ logger: stderrLogger, defaultTimeoutMs: 5_000, cacheTtlMs: 60_000, cacheMaxEntries: 10 }),

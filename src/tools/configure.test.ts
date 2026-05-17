@@ -66,6 +66,15 @@ function makeFakeWatcher(): FolderWatcher {
   } as unknown as FolderWatcher;
 }
 
+function makeFakeConfigWatcher(): ServerDeps['configWatcher'] {
+  return {
+    start: vi.fn(async () => {}),
+    stop: vi.fn(async () => {}),
+    isRunning: () => false,
+    getConfigPath: () => '/fake/config.json',
+  } as unknown as ServerDeps['configWatcher'];
+}
+
 function makeDeps(overrides: {
   store: ConfigStore;
   folders?: string[];
@@ -96,6 +105,7 @@ function makeDeps(overrides: {
     factory: new StrategyFactory([new PromptStrategy()]),
     blacklistFilter: new BlacklistFilter(),
     folderWatcher: overrides.folderWatcher ?? makeFakeWatcher(),
+    configWatcher: makeFakeConfigWatcher(),
     logger: stderrLogger,
     sandboxRunner: new SandboxRunner({}),
     decoratorChain: new DecoratorChain({ logger: stderrLogger, defaultTimeoutMs: 5_000, cacheTtlMs: 60_000, cacheMaxEntries: 10 }),
@@ -107,12 +117,39 @@ function makeDeps(overrides: {
 // ---------------------------------------------------------------------------
 
 describe('handleConfigure — list_folders', () => {
-  it('returns current folders without calling save', async () => {
-    const { store, saved } = makeFakeStore();
-    const deps = makeDeps({ store, folders: ['/a', '/b'] });
+  it('returns folders resolved fresh from disk without calling save', async () => {
+    const folderA = resolve('/a');
+    const folderB = resolve('/b');
+    const { store, saved } = makeFakeStore({
+      folders: [
+        { path: folderA, priority: 100, enabled: true, tags: [] },
+        { path: folderB, priority: 90, enabled: true, tags: [] },
+      ],
+    });
+    const deps = makeDeps({ store });
     const result = await handleConfigure(deps, { action: 'list_folders' });
-    expect(result.folders).toEqual(['/a', '/b']);
+    expect(result.folders).toEqual([folderA, folderB]);
     expect(saved).toHaveLength(0);
+  });
+
+  it('reflects an out-of-process config.json mutation, not the stale in-memory snapshot', async () => {
+    // deps.folders is the startup snapshot ['/stale']. The config file is then
+    // rewritten out-of-band (simulating the `skillforge folders` CLI).
+    // list_folders must read disk truth, not deps.folders.
+    const { store } = makeFakeStore({
+      folders: [{ path: resolve('/stale'), priority: 100, enabled: true, tags: [] }],
+    });
+    const deps = makeDeps({ store, folders: [resolve('/stale')] });
+
+    const newFolder = resolve('/fresh-from-cli');
+    await store.save({
+      ...defaultConfig(),
+      folders: [{ path: newFolder, priority: 100, enabled: true, tags: [] }],
+    });
+
+    const result = await handleConfigure(deps, { action: 'list_folders' });
+    expect(result.folders).toEqual([newFolder]);
+    expect(result.folders).not.toContain(resolve('/stale'));
   });
 });
 
