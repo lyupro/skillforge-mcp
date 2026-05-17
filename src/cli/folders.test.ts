@@ -73,7 +73,7 @@ describe('folders.main', () => {
       });
       expect(code).toBe(0);
       expect(out).toContain('Registered folder');
-      expect(out).toContain('also loaded by the Claude Code plugin');
+      expect(out).toContain('also served by the Claude Code plugin');
       expect(out).toContain('some-marketplace/some-plugin');
       const config = await readConfig();
       expect(config.folders).toHaveLength(1);
@@ -83,7 +83,7 @@ describe('folders.main', () => {
       const code = await main(['add', skillDir], deps());
       expect(code).toBe(0);
       expect(out).toContain('Registered folder');
-      expect(out).not.toContain('also loaded by');
+      expect(out).not.toContain('also served by');
     });
 
     it('applies --priority, --tags and --disabled flags', async () => {

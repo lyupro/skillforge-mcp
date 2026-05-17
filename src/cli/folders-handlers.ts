@@ -112,7 +112,7 @@ export async function handleAdd(
   await store.save(config);
   stdout(`Registered folder: ${absPath}\n`);
   // Informational only: a conflict does not block the add or change the exit code.
-  const conflict = detectSkillSourceConflict(absPath);
+  const conflict = await detectSkillSourceConflict(absPath);
   if (conflict !== null) {
     stdout(`${formatConflictHint(conflict)}\n`);
   }

@@ -7,15 +7,25 @@
  * user can disable one source. We NEVER mutate another tool's config: this is
  * detection + hint only.
  *
- * Detection is pure path logic — no host config file is read or written.
- * The home directory is injectable so tests can supply a fake root.
+ * For Claude Code plugins, the detector reads ~/.claude/settings.json to check
+ * whether the plugin is actually enabled. The home directory and the settings
+ * reader are both injectable so tests never touch real host files.
  */
 
 import { homedir } from 'node:os';
 import { resolve, sep } from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 /** A host CLI whose native plugin/extension system can double-load skills. */
 export type ConflictHost = 'claude' | 'gemini';
+
+/**
+ * Whether the conflicting host plugin/extension is currently enabled.
+ * - 'enabled'  — key present in host settings with value true.
+ * - 'disabled' — key present in host settings with value false.
+ * - 'unknown'  — settings file missing, unreadable, malformed, or no state API.
+ */
+export type PluginEnabledState = 'enabled' | 'disabled' | 'unknown';
 
 export interface SkillSourceConflict {
   /** The host CLI that natively serves skills from this path. */
@@ -26,11 +36,57 @@ export interface SkillSourceConflict {
   name: string;
   /** The absolute folder path that triggered the conflict. */
   folderPath: string;
+  /** Whether the conflicting plugin/extension is currently enabled in host settings. */
+  enabledState: PluginEnabledState;
 }
 
 /** Normalise to an absolute path with consistent separators for prefix tests. */
 function normalize(p: string): string {
   return resolve(p);
+}
+
+/**
+ * Read the Claude Code plugin enabled state from ~/.claude/settings.json.
+ * The key in `enabledPlugins` is `"<plugin>@<marketplace>"`.
+ * Returns 'disabled' | 'enabled' | 'unknown'.
+ */
+async function readClaudePluginEnabled(
+  settingsPath: string,
+  pluginKey: string,
+): Promise<PluginEnabledState> {
+  try {
+    const raw = await readFile(settingsPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      !('enabledPlugins' in parsed) ||
+      typeof (parsed as Record<string, unknown>).enabledPlugins !== 'object' ||
+      (parsed as Record<string, unknown>).enabledPlugins === null
+    ) {
+      return 'unknown';
+    }
+    const enabledPlugins = (parsed as Record<string, unknown>).enabledPlugins as Record<
+      string,
+      unknown
+    >;
+    if (!(pluginKey in enabledPlugins)) return 'unknown';
+    return enabledPlugins[pluginKey] === false ? 'disabled' : 'enabled';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Default implementation of the injectable plugin-state resolver for Claude Code.
+ * Reads the real ~/.claude/settings.json on the host machine.
+ */
+async function defaultReadPluginEnabled(
+  home: string,
+  pluginKey: string,
+): Promise<PluginEnabledState> {
+  const settingsPath = resolve(home, '.claude', 'settings.json');
+  return readClaudePluginEnabled(settingsPath, pluginKey);
 }
 
 /**
@@ -55,20 +111,25 @@ function segmentsUnder(child: string, root: string): string[] | null {
  *
  * - Claude Code — `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/...`
  *   The plugin name is the `<plugin>` segment (the marketplace prefix is
- *   included when present for a clearer label).
+ *   included when present for a clearer label). The enabled state is read from
+ *   `~/.claude/settings.json` via the injectable `readPluginEnabled` resolver.
+ *   When the plugin is DISABLED, returns null (no conflict).
  * - Gemini CLI — `~/.gemini/extensions/<extension>/...`
- *   The extension name is the first segment after `extensions/`.
+ *   The extension name is the first segment after `extensions/`. No reliable
+ *   enabled-state file is available; always returns `enabledState: 'unknown'`.
  *
  * Codex and Cursor have no native skill system — they never conflict.
  *
- * @param folderPath Absolute folder path being registered.
- * @param home       Home directory root, injectable for tests.
+ * @param folderPath        Absolute folder path being registered.
+ * @param home              Home directory root, injectable for tests.
+ * @param readPluginEnabled Injectable resolver for Claude plugin enabled state.
  * @returns A conflict descriptor, or null when there is no conflict.
  */
-export function detectSkillSourceConflict(
+export async function detectSkillSourceConflict(
   folderPath: string,
   home: string = homedir(),
-): SkillSourceConflict | null {
+  readPluginEnabled: (home: string, pluginKey: string) => Promise<PluginEnabledState> = defaultReadPluginEnabled,
+): Promise<SkillSourceConflict | null> {
   const claudeCacheRoot = resolve(home, '.claude', 'plugins', 'cache');
   const claudeSegments = segmentsUnder(folderPath, claudeCacheRoot);
   if (claudeSegments !== null && claudeSegments.length > 0) {
@@ -77,11 +138,15 @@ export function detectSkillSourceConflict(
     const marketplace = claudeSegments[0]!;
     const plugin = claudeSegments[1];
     const name = plugin !== undefined ? `${marketplace}/${plugin}` : marketplace;
+    const pluginKey = plugin !== undefined ? `${plugin}@${marketplace}` : marketplace;
+    const enabledState = await readPluginEnabled(home, pluginKey);
+    if (enabledState === 'disabled') return null;
     return {
       host: 'claude',
       kind: 'plugin',
       name,
       folderPath: normalize(folderPath),
+      enabledState,
     };
   }
 
@@ -93,6 +158,7 @@ export function detectSkillSourceConflict(
       kind: 'extension',
       name: geminiSegments[0]!,
       folderPath: normalize(folderPath),
+      enabledState: 'unknown',
     };
   }
 
@@ -115,11 +181,21 @@ function disableCommand(conflict: SkillSourceConflict): string {
 /**
  * Build the user-facing warning for a detected conflict. SkillForge prints
  * this as an informational hint — it does not disable anything itself.
+ *
+ * - enabledState 'enabled'  → direct "disable it" wording.
+ * - enabledState 'unknown'  → conditional "IF enabled" wording.
  */
 export function formatConflictHint(conflict: SkillSourceConflict): string {
+  const prefix =
+    `Warning: ${conflict.folderPath} is also served by the ` +
+    `${hostLabel(conflict.host)} ${conflict.kind} "${conflict.name}".`;
+  if (conflict.enabledState === 'unknown') {
+    return (
+      `${prefix} IF that ${conflict.kind} is enabled, skills load twice — ` +
+      `check ${conflict.host === 'claude' ? '/plugin' : `/extensions disable ${conflict.name}`}`
+    );
+  }
   return (
-    `Warning: ${conflict.folderPath} is also loaded by the ` +
-    `${hostLabel(conflict.host)} ${conflict.kind} "${conflict.name}". ` +
-    `To avoid loading these skills twice, disable it: ${disableCommand(conflict)}`
+    `${prefix} To avoid loading these skills twice, disable it: ${disableCommand(conflict)}`
   );
 }
