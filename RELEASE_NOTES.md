@@ -7,6 +7,23 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.4.0 — Config live-reload and skills CLI
+
+**Release date:** 2026-05-17
+
+Four reliability and usability improvements.
+
+- **Config live-reload.** The `skillforge folders` CLI writes `config.json` from a separate process; a long-lived MCP server held a startup folder snapshot and never picked up those edits without a restart. A new `ConfigWatcher` watches the config directory (handles atomic temp+rename saves) and reconciles the folder list and skill registry on every change. `skills__configure` `list_folders` and `get_blacklist` now report current disk state.
+- **`skillforge skills` CLI subcommand.** There was no terminal-side way to inspect the skill registry without opening an LLM session. `skills list` prints a table of all registered skills with `--search`, `--source`, `--folder <path|alias>`, `--folder-tag`, `--json`, and `--folder-fmt alias|path` filters. `skills get <name>` prints the full SKILL.md of one skill. `skills reload` forces a registry rebuild and prints folder/skill counts.
+- **Conflict-hint accuracy.** The skill-source conflict detector warned when a registered folder overlapped with a host plugin's native store — but warned even for plugins that were already disabled. It now reads the host's plugin enable state: disabled plugins produce no warning; unknown state produces a softened conditional hint.
+- **Config forward-compatibility.** All Zod config schemas previously used `strip` mode, silently dropping unknown keys on load/save. A config written by a newer version of SkillForge would lose unrecognised fields when read by an older version. All schemas now use `passthrough`, so unknown future keys survive a load/save round-trip.
+
+**Engineering snapshot**
+
+- 609 / 609 tests passing + 1 win32-skip (610 total).
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean.
+- All 68 source files ≤ 400 lines.
+
 ## v1.3.0 — Folder ergonomics
 
 **Release date:** 2026-05-16

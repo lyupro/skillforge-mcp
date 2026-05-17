@@ -46,6 +46,18 @@ Resolved paths are deduplicated and absolutised before being handed to `FileScan
 
 ---
 
+## Config live-reload
+
+When the `skillforge folders` CLI writes `config.json` from a separate process, a running MCP server detects the change automatically. The `ConfigWatcher` monitors the config directory (surviving atomic temp+rename saves) and reconciles the folder list and skill registry on every write. `skills__configure` `list_folders` and `get_blacklist` therefore report current disk state rather than the in-memory snapshot from server boot. Security gates, watcher settings, and invocation defaults still require a server restart — only folder and blacklist state live-reloads.
+
+---
+
+## Forward-compatible config schemas
+
+All config schemas use Zod `passthrough` mode. A `config.json` written by a newer version of SkillForge that contains fields the current version does not recognise will have those fields preserved across a load/save round-trip. Older versions reading a newer config will not silently degrade it.
+
+---
+
 ## Managing folders from the terminal
 
 Folders can be registered three ways: the `SKILLFORGE_FOLDERS` env var, the `skills__configure` MCP tool (from inside an LLM session), and the `skillforge folders` CLI subcommand (from the shell). All three persist to the same config file.

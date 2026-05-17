@@ -1,6 +1,6 @@
 # Install CLI
 
-One-command wiring of SkillForge MCP into Claude Code, Codex CLI, and Cursor. Shipped in **v1.1**.
+One-command wiring of SkillForge MCP into Claude Code, Codex CLI, and Cursor. Shipped in **v1.1**. For managing the skill registry from the terminal (list, get, reload), see the `skillforge skills` subcommand — available since **v1.4**.
 
 ## Overview
 

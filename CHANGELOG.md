@@ -2,6 +2,30 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-05-17
+
+Config live-reload, a new `skills` CLI subcommand, more accurate conflict detection, and forward-compatible config schemas.
+
+### Added
+
+- **`ConfigWatcher`** (`src/watcher/config-watcher.ts`) — watches the config directory and reconciles the folder list and skill registry whenever `config.json` changes on disk. Previously a long-lived MCP server held a startup snapshot and never saw edits made by the `skillforge folders` CLI (which writes from a separate process) until the server was restarted. `skills__configure` `list_folders` and `get_blacklist` now report current disk state instead of the in-memory snapshot.
+- **`skillforge skills` CLI subcommand** (`src/cli/skills.ts`) — terminal-side skill inspection without an LLM session. Three commands:
+  - `skills list` — prints a table of all registered skills. Filters: `--search <text>`, `--source <name>`, `--folder <path|alias>`, `--folder-tag <name>`. Display options: `--json`, `--folder-fmt alias|path` (the `FOLDER` column shows the alias by default when one is set).
+  - `skills get <name>` — prints the full SKILL.md body and frontmatter for a single skill.
+  - `skills reload` — forces a full registry rescan and prints folder/skill counts.
+
+### Changed
+
+- **Conflict-hint accuracy** (`src/detect/skill-source-conflict.ts`) — the skill-source conflict detector (warns when a registered folder overlaps with a host plugin's native store, which would double-load skills) previously ran on path logic alone and warned even for plugins the user had already disabled. It now reads the host's plugin enable state: a disabled plugin produces no warning; an unknown/unreadable enable state produces a softened conditional hint.
+- **Config schema forward-compatibility** (`src/config/config-schema.ts`) — all Zod config schemas previously used the default `strip` mode, silently dropping unknown keys on load/save. Any config written by a newer version of SkillForge would lose unrecognised fields when read by an older version. All schemas now use `passthrough`, so unknown keys survive a full load/save round-trip.
+
+### Verified
+
+- 609 / 609 tests passing + 1 win32-skip (610 total).
+- `pnpm lint` (`tsc --noEmit`) clean.
+- `pnpm build` clean.
+- `pnpm check:size` — all 68 source files ≤ 400 lines.
+
 ## [1.3.0] — 2026-05-16
 
 Folder ergonomics — address folders by a short alias, toggle them on and off, and filter skills by folder tag.
@@ -178,6 +202,7 @@ All 10 verified through real parse pipeline + `StrategyFactory.create()` correct
 - **`pnpm build`** clean.
 - **`pnpm smoke`** end-to-end via subprocess `dist/server.js` — LoggingDecorator trace visible.
 
+[1.4.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.4.0
 [1.3.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.3.0
 [1.2.0]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.2.0
 [1.1.1]: https://github.com/lyupro/skillforge-mcp/releases/tag/v1.1.1
