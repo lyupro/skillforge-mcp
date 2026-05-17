@@ -27,6 +27,7 @@
 import { main as installMain } from './install.js';
 import { main as toolsMain } from './tools.js';
 import { main as foldersMain } from './folders.js';
+import { main as skillsMain } from './skills.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
 
@@ -51,6 +52,12 @@ Commands:
   folders      Manage skill folders from the terminal (list/add/remove/reset).
                Run "skillforge-mcp folders" for sub-action usage.
                  Example: skillforge-mcp folders add ~/.lyupro/skills
+  skills       View and reload skills from the terminal (list/get/reload).
+               The CLI reads disk, not a live server session.
+               Run "skillforge-mcp skills" for sub-action usage.
+                 Example: skillforge-mcp skills list
+                 Example: skillforge-mcp skills get code-review
+                 Example: skillforge-mcp skills reload
 
 Options:
   --help, -h   Show this message.
@@ -83,22 +90,15 @@ export interface ServeDeps {
 
 async function defaultStartServe(): Promise<void> {
   const { buildDeps, buildServer } = await import('../server.js');
+  const { startRuntime, registerShutdown } = await import('../runtime.js');
   const { StdioServerTransport } = await import(
     '@modelcontextprotocol/sdk/server/stdio.js'
   );
   const deps = await buildDeps();
   const server = buildServer(deps);
   await server.connect(new StdioServerTransport());
-  await deps.folderWatcher.start();
-  const shutdown = async (): Promise<void> => {
-    await deps.folderWatcher.stop();
-  };
-  process.once('SIGTERM', () => {
-    void shutdown();
-  });
-  process.once('SIGINT', () => {
-    void shutdown();
-  });
+  await startRuntime(deps);
+  registerShutdown(deps);
 }
 
 /**
@@ -134,6 +134,9 @@ export async function main(
   }
   if (first === 'folders') {
     return foldersMain(rawArgv.slice(1));
+  }
+  if (first === 'skills') {
+    return skillsMain(rawArgv.slice(1));
   }
   if (first === 'serve' || first === undefined) {
     const start = overrides.startServe ?? defaultStartServe;

@@ -132,6 +132,20 @@ describe('dispatcher.main', () => {
     });
   });
 
+  describe('skills subcommand', () => {
+    it('routes to the skills handler and returns its exit code', async () => {
+      const code = await main(['skills']);
+      expect(code).toBe(2);
+      expect(errors.join('')).toContain('skillforge skills');
+    });
+
+    it('--help lists the skills command', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('skills');
+    });
+  });
+
   describe('unknown command', () => {
     it('returns exit code 2 and writes error', async () => {
       const code = await main(['weeble']);
