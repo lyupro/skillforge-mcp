@@ -2,6 +2,14 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-05-18
+
+A fix for the CLI silently doing nothing under a global install.
+
+### Fixed
+
+- **CLI was a silent no-op when installed globally** (`src/cli/dispatcher.ts`) — `npm install -g` installs the bin as a symlink (`/usr/bin/skillforge-mcp` → `dist/cli/dispatcher.js`). The dispatcher gated its entry point on `process.argv[1] === fileURLToPath(import.meta.url)`; under a symlinked bin `process.argv[1]` is the symlink path while `import.meta.url` resolves to the real file, so the strings never matched. Every command — `install`, `serve`, `tools`, `folders`, `skills`, `--version`, `--help` — parsed, did nothing, and exited 0 with no output. Affected every global install on Linux/macOS; Windows escaped it because the npm `.cmd` shim passes the resolved file path as `argv[1]`. Entry detection now resolves both sides through `realpath` (new exported `isMainModule` helper), so symlinked and direct invocations both work.
+
 ## [1.4.0] — 2026-05-17
 
 Config live-reload, a new `skills` CLI subcommand, more accurate conflict detection, and forward-compatible config schemas.

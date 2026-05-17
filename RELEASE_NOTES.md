@@ -7,6 +7,20 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.4.1 — Global-install CLI fix
+
+**Release date:** 2026-05-18
+
+A single fix for a serious one: the CLI did nothing when installed globally.
+
+- **The CLI was a silent no-op under `npm install -g`.** A global install puts the bin on `PATH` as a symlink (`/usr/bin/skillforge-mcp` → `dist/cli/dispatcher.js`). The dispatcher decided whether to run by comparing `process.argv[1]` to its own file path — but under a symlinked bin those are different strings (the symlink path vs. the real file), so the comparison failed and `main()` never ran. Every command — `install`, `serve`, `tools`, `folders`, `skills`, `--version`, `--help` — returned to the prompt instantly with no output and exit code 0. This hit every Linux and macOS global install since the dispatcher shipped in v1.1.1; Windows was unaffected because its npm `.cmd` shim passes the resolved file path. Entry detection now resolves both paths through `realpath` before comparing, so symlinked bins, direct `node dist/cli/dispatcher.js` invocations, and `npx` all work.
+
+**Engineering snapshot**
+
+- Tests passing + 1 win32-skip; a new symlink regression test covers the global-install path.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean.
+- All source files ≤ 400 lines.
+
 ## v1.4.0 — Config live-reload and skills CLI
 
 **Release date:** 2026-05-17

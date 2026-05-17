@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { main, readPackageVersion } from './dispatcher.js';
+import { mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { main, readPackageVersion, isMainModule } from './dispatcher.js';
 
 describe('dispatcher.main', () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
@@ -161,5 +165,51 @@ describe('readPackageVersion', () => {
   it('reads version string from package.json', async () => {
     const version = await readPackageVersion();
     expect(version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+});
+
+describe('isMainModule', () => {
+  it('returns false when argv[1] is undefined', () => {
+    expect(isMainModule(undefined, import.meta.url)).toBe(false);
+  });
+
+  it('returns true on a direct path match (no symlink)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-dispatch-'));
+    try {
+      const real = join(dir, 'real.js');
+      writeFileSync(real, '// entry\n');
+      expect(isMainModule(real, pathToFileURL(real).href)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'returns true when argv[1] is a symlink to the module (global-install case)',
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), 'sf-dispatch-'));
+      try {
+        const real = join(dir, 'dispatcher.js');
+        const link = join(dir, 'skillforge-mcp');
+        writeFileSync(real, '// entry\n');
+        symlinkSync(real, link);
+        // argv[1] = symlink path, import.meta.url = real file — must still match.
+        expect(isMainModule(link, pathToFileURL(real).href)).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('returns false (no throw) when argv[1] does not exist', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-dispatch-'));
+    try {
+      const real = join(dir, 'real.js');
+      writeFileSync(real, '// entry\n');
+      const missing = join(dir, 'does-not-exist.js');
+      expect(isMainModule(missing, pathToFileURL(real).href)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

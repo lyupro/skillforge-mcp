@@ -24,6 +24,8 @@
  *   without an `--package=` override.
  */
 
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { main as installMain } from './install.js';
 import { main as toolsMain } from './tools.js';
 import { main as foldersMain } from './folders.js';
@@ -82,6 +84,30 @@ export async function readPackageVersion(): Promise<string> {
     throw new Error('package.json missing string "version" field');
   }
   return parsed.version;
+}
+
+/**
+ * True when this module file is the process entry point — robust to symlinked
+ * bins. `npm install -g` installs the bin as a symlink (e.g.
+ * `/usr/bin/skillforge-mcp` → `dist/cli/dispatcher.js`), so `process.argv[1]`
+ * holds the symlink path while `import.meta.url` resolves to the real file.
+ * A direct string compare of the two never matches under a global install,
+ * which left the CLI a silent no-op on every Linux/macOS install. Both sides
+ * are passed through `realpath` so the symlinked and direct-invocation cases
+ * both resolve to the same canonical path.
+ */
+export function isMainModule(
+  entryArg: string | undefined,
+  moduleUrl: string,
+): boolean {
+  if (entryArg === undefined) return false;
+  const modulePath = fileURLToPath(moduleUrl);
+  if (entryArg === modulePath) return true;
+  try {
+    return realpathSync(entryArg) === realpathSync(modulePath);
+  } catch {
+    return false;
+  }
 }
 
 export interface ServeDeps {
@@ -150,11 +176,7 @@ export async function main(
   return 2;
 }
 
-import { fileURLToPath } from 'node:url';
-const isDirectRun =
-  process.argv[1] !== undefined &&
-  fileURLToPath(import.meta.url) === process.argv[1];
-if (isDirectRun) {
+if (isMainModule(process.argv[1], import.meta.url)) {
   main(process.argv.slice(2))
     .then((code) => {
       if (code !== null) process.exit(code);

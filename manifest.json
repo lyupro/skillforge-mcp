@@ -2,7 +2,7 @@
   "$schema": "https://modelcontextprotocol.io/schemas/manifest.json",
   "name": "@lyupro/skillforge-mcp",
   "displayName": "SkillForge MCP",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Universal Skills MCP server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
   "author": {
     "name": "Lyu Pro",
