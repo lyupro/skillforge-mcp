@@ -163,6 +163,44 @@ describe('ConfigStore.save()', () => {
     const loaded = await store.load();
     expect(loaded).toEqual(config);
   });
+
+  it('preserves unknown top-level key across load→save→load (forward-compat round-trip)', async () => {
+    const withFuture = JSON.stringify({
+      ...defaultConfig(),
+      futureTopLevelKey: 'survive',
+    });
+    const fakeFs = makeFakeFs({ [TEST_PATH]: withFuture });
+    const store = new ConfigStore({ filePath: TEST_PATH, fs: fakeFs });
+
+    const loaded = await store.load();
+    expect((loaded as Record<string, unknown>)['futureTopLevelKey']).toBe('survive');
+
+    await store.save(loaded);
+
+    const saved = fakeFs.store.get(TEST_PATH);
+    const reparsed = JSON.parse(saved!) as Record<string, unknown>;
+    expect(reparsed['futureTopLevelKey']).toBe('survive');
+  });
+
+  it('preserves unknown folder entry key across load→save→load (forward-compat round-trip)', async () => {
+    const withFuture = JSON.stringify({
+      ...defaultConfig(),
+      folders: [{ path: '/foo', futureField: 'keep' }],
+    });
+    const fakeFs = makeFakeFs({ [TEST_PATH]: withFuture });
+    const store = new ConfigStore({ filePath: TEST_PATH, fs: fakeFs });
+
+    const loaded = await store.load();
+    const folders = (loaded as Record<string, unknown>)['folders'] as Record<string, unknown>[];
+    expect(folders[0]!['futureField']).toBe('keep');
+
+    await store.save(loaded);
+
+    const saved = fakeFs.store.get(TEST_PATH);
+    const reparsed = JSON.parse(saved!) as Record<string, unknown>;
+    const savedFolders = reparsed['folders'] as Record<string, unknown>[];
+    expect(savedFolders[0]!['futureField']).toBe('keep');
+  });
 });
 
 describe('ConfigStore.getFilePath()', () => {

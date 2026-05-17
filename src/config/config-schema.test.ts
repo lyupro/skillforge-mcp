@@ -26,9 +26,9 @@ describe('configSchema', () => {
     expect(roundTripped).toEqual(original);
   });
 
-  it('strips unknown extra fields', () => {
-    const result = configSchema.parse({ unknownField: 'ignored', version: '1.0' });
-    expect('unknownField' in result).toBe(false);
+  it('preserves unknown extra fields (passthrough — forward-compatibility)', () => {
+    const result = configSchema.parse({ unknownField: 'keep-me', version: '1.0' });
+    expect((result as Record<string, unknown>)['unknownField']).toBe('keep-me');
     expect(result.version).toBe('1.0');
   });
 
@@ -132,5 +132,20 @@ describe('configSchema', () => {
     expect(result.security.autoAudit).toBe(false);
     expect(result.security.allowScripts).toBe(false);
     expect(result.security.sandboxScripts).toBe(true);
+  });
+
+  it('preserves unknown key inside a folder entry after parse', () => {
+    const result = configSchema.parse({
+      folders: [{ path: '/foo', futureField: 'bar' }],
+    });
+    const folder = result.folders[0] as Record<string, unknown>;
+    expect(folder['futureField']).toBe('bar');
+  });
+
+  it('preserves unknown key in a section schema after parse', () => {
+    const result = configSchema.parse({
+      security: { autoAudit: false, futureSecurityField: true },
+    });
+    expect((result.security as Record<string, unknown>)['futureSecurityField']).toBe(true);
   });
 });
