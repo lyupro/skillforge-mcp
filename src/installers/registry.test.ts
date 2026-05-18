@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { getAllInstallers, getInstallerByName } from './registry.js';
 
 describe('getAllInstallers', () => {
-  it('returns three installers in claude/codex/cursor order', () => {
+  it('returns four installers in claude/codex/cursor/hermes order', () => {
     const list = getAllInstallers();
-    expect(list).toHaveLength(3);
-    expect(list.map((i) => i.name)).toEqual(['claude', 'codex', 'cursor']);
+    expect(list).toHaveLength(4);
+    expect(list.map((i) => i.name)).toEqual(['claude', 'codex', 'cursor', 'hermes']);
   });
 
   it('each installer exposes the full contract', () => {
@@ -23,6 +23,7 @@ describe('getInstallerByName', () => {
     expect(getInstallerByName('claude').name).toBe('claude');
     expect(getInstallerByName('codex').name).toBe('codex');
     expect(getInstallerByName('cursor').name).toBe('cursor');
+    expect(getInstallerByName('hermes').name).toBe('hermes');
   });
 
   it('defaults to global scope when no scope is given', () => {
@@ -36,15 +37,16 @@ describe('getInstallerByName', () => {
 });
 
 describe('getAllInstallers with scope', () => {
-  it('global scope returns three installers', () => {
+  it('global scope returns four installers', () => {
     expect(getAllInstallers('global').map((i) => i.name)).toEqual([
       'claude',
       'codex',
       'cursor',
+      'hermes',
     ]);
   });
 
-  it('project scope returns three installers for a valid root', () => {
-    expect(getAllInstallers('project', process.cwd())).toHaveLength(3);
+  it('project scope returns four installers for a valid root', () => {
+    expect(getAllInstallers('project', process.cwd())).toHaveLength(4);
   });
 });

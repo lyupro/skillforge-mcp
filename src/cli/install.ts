@@ -29,6 +29,7 @@ export interface ParsedArgs {
   claude: boolean;
   codex: boolean;
   cursor: boolean;
+  hermes: boolean;
   all: boolean;
   dryRun: boolean;
   uninstall: boolean;
@@ -55,6 +56,7 @@ Targets (at least one required, unless --help):
   --claude            Edit ~/.claude.json
   --codex             Edit ~/.codex/config.toml
   --cursor            Edit ~/.cursor/mcp.json
+  --hermes            Edit ~/.hermes/config.yaml (or $HERMES_HOME/config.yaml)
   --all               Auto-detect installed hosts and install into each
 
 Modes:
@@ -75,10 +77,12 @@ Scope:
                         claude → ~/.claude.json
                         codex  → ~/.codex/config.toml
                         cursor → ~/.cursor/mcp.json
+                        hermes → ~/.hermes/config.yaml
   --scope project     edit a repo-local config rooted at the current directory:
                         claude → ./.mcp.json
                         codex  → ./.codex/config.toml
                         cursor → ./.cursor/mcp.json
+                        hermes → ./.hermes/config.yaml
 
   --help, -h          Show this message
 `;
@@ -88,6 +92,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     claude: false,
     codex: false,
     cursor: false,
+    hermes: false,
     all: false,
     dryRun: false,
     uninstall: false,
@@ -108,6 +113,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--cursor':
         out.cursor = true;
+        break;
+      case '--hermes':
+        out.hermes = true;
         break;
       case '--all':
         out.all = true;
@@ -175,8 +183,19 @@ function chooseInstallers(args: ParsedArgs, all: Installer[]): Installer[] {
   if (args.cursor) {
     picked.push(all.find((i) => i.name === 'cursor') ?? getInstallerByName('cursor', args.scope));
   }
+  if (args.hermes) {
+    picked.push(all.find((i) => i.name === 'hermes') ?? getInstallerByName('hermes', args.scope));
+  }
   return picked;
 }
+
+// Hermes caches its MCP tool list; a fresh install stays invisible until the
+// host re-opens MCP tools. Printed once after a real Hermes install/update.
+const HERMES_RELOAD_HINT =
+  '[hermes] Hermes caches its MCP tool list — reload to pick up SkillForge:\n' +
+  '         CLI: run /reload-mcp or start a new session;\n' +
+  '         Telegram gateway: run `hermes gateway restart`.\n' +
+  '         Verify with: hermes mcp list';
 
 function formatInstall(r: InstallResult): string {
   const tag = r.status.toUpperCase();
@@ -209,9 +228,9 @@ export async function runInstall(args: ParsedArgs, deps: RunDeps = {}): Promise<
     stdout(USAGE);
     return 0;
   }
-  if (!args.all && !args.claude && !args.codex && !args.cursor) {
+  if (!args.all && !args.claude && !args.codex && !args.cursor && !args.hermes) {
     stderr(USAGE);
-    stderr('\nError: choose at least one of --claude / --codex / --cursor / --all');
+    stderr('\nError: choose at least one of --claude / --codex / --cursor / --hermes / --all');
     return 2;
   }
 
@@ -263,7 +282,12 @@ export async function runInstall(args: ParsedArgs, deps: RunDeps = {}): Promise<
       } else {
         const result = await inst.install(opts);
         stdout(formatInstall(result));
-        if (result.status === 'already-installed') exit = exit === 0 ? 0 : exit;
+        if (
+          inst.name === 'hermes' &&
+          (result.status === 'installed' || result.status === 'updated')
+        ) {
+          stdout(HERMES_RELOAD_HINT);
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

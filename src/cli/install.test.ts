@@ -66,6 +66,7 @@ describe('parseArgs', () => {
     expect(args.claude).toBe(true);
     expect(args.codex).toBe(false);
     expect(args.cursor).toBe(false);
+    expect(args.hermes).toBe(false);
     expect(args.all).toBe(false);
   });
 
@@ -73,6 +74,12 @@ describe('parseArgs', () => {
     const args = parseArgs(['--codex', '--cursor']);
     expect(args.codex).toBe(true);
     expect(args.cursor).toBe(true);
+    expect(args.claude).toBe(false);
+  });
+
+  it('parses --hermes', () => {
+    const args = parseArgs(['--hermes']);
+    expect(args.hermes).toBe(true);
     expect(args.claude).toBe(false);
   });
 
@@ -169,6 +176,23 @@ describe('runInstall dispatch', () => {
     expect(claude.installCalls).toBe(0);
     expect(codex.installCalls).toBe(1);
     expect(cursor.installCalls).toBe(1);
+  });
+
+  it('--hermes routes only to the Hermes installer', async () => {
+    const claude = makeFakeInstaller('claude');
+    const codex = makeFakeInstaller('codex');
+    const cursor = makeFakeInstaller('cursor');
+    const hermes = makeFakeInstaller('hermes');
+    const cap = makeCapture();
+    await runInstall(parseArgs(['--hermes']), {
+      installers: [claude, codex, cursor, hermes],
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(hermes.installCalls).toBe(1);
+    expect(claude.installCalls).toBe(0);
+    expect(codex.installCalls).toBe(0);
+    expect(cursor.installCalls).toBe(0);
   });
 
   it('--all installs into every detected host', async () => {
@@ -394,15 +418,16 @@ describe('--scope end-to-end (real installers, temp cwd)', () => {
     expect(cap.out.join('\n')).toContain('.mcp.json');
   });
 
-  it('--scope project creates ./.cursor/mcp.json and ./.codex/config.toml', async () => {
+  it('--scope project creates per-host repo-local configs', async () => {
     const cap = makeCapture();
-    const code = await runInstall(parseArgs(['--cursor', '--codex', '--scope', 'project']), {
-      stdout: cap.stdout,
-      stderr: cap.stderr,
-    });
+    const code = await runInstall(
+      parseArgs(['--cursor', '--codex', '--hermes', '--scope', 'project']),
+      { stdout: cap.stdout, stderr: cap.stderr },
+    );
     expect(code).toBe(0);
     expect(existsSync(join(dir, '.cursor', 'mcp.json'))).toBe(true);
     expect(existsSync(join(dir, '.codex', 'config.toml'))).toBe(true);
+    expect(existsSync(join(dir, '.hermes', 'config.yaml'))).toBe(true);
   });
 
   it('default scope (global) does NOT write into cwd', async () => {
