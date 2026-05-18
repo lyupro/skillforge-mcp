@@ -1,10 +1,14 @@
 /**
- * Atomic JSON / TOML helpers with .backup snapshots.
+ * Atomic JSON / TOML / text helpers with .backup snapshots.
  *
  * Read helpers return null on missing file, throw on corrupt content.
  * Write helpers go via <path>.tmp + fs.rename and snapshot the previous
  * content into <path>.backup before overwriting. On rename failure the
  * backup is restored.
+ *
+ * The text helpers carry no format knowledge — a caller that needs to
+ * preserve comments (e.g. the YAML installer) parses and serializes the
+ * document itself, then writes the resulting string atomically here.
  */
 
 import { readFile, writeFile, rename, mkdir, access, copyFile, unlink } from 'node:fs/promises';
@@ -89,6 +93,22 @@ export async function writeTomlAtomic(path: string, data: Record<string, unknown
   await mkdir(dirname(path), { recursive: true });
   const tmpPath = `${path}.tmp`;
   const contents = toml.stringify(data as toml.JsonMap);
+  await writeFile(tmpPath, contents, 'utf8');
+  await backupAndRename(path, tmpPath);
+}
+
+export async function readTextSafe(path: string): Promise<string | null> {
+  if (!(await fileExists(path))) return null;
+  try {
+    return await readFile(path, 'utf8');
+  } catch (err) {
+    throw new Error(`atomic-write: failed to read "${path}": ${String(err)}`);
+  }
+}
+
+export async function writeTextAtomic(path: string, contents: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const tmpPath = `${path}.tmp`;
   await writeFile(tmpPath, contents, 'utf8');
   await backupAndRename(path, tmpPath);
 }
