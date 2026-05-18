@@ -1,11 +1,12 @@
 # Installation
 
-This guide covers wiring SkillForge MCP into the four supported integrations:
+This guide covers wiring SkillForge MCP into the five supported integrations:
 
 - [Claude Code](#1-claude-code)
 - [OpenAI Codex CLI](#2-openai-codex-cli)
 - [Cursor](#3-cursor)
-- [Manual MCP client](#4-manual-mcp-client) (custom integration via `@modelcontextprotocol/sdk`)
+- [Hermes Agent](#4-hermes-agent)
+- [Manual MCP client](#5-manual-mcp-client) (custom integration via `@modelcontextprotocol/sdk`)
 
 For per-tool deep dives, see [INTEGRATION/](./INTEGRATION/).
 
@@ -17,7 +18,7 @@ For per-tool deep dives, see [INTEGRATION/](./INTEGRATION/).
 npx @lyupro/skillforge-mcp install --all
 ```
 
-It supports `--claude` / `--codex` / `--cursor` / `--all`, plus `--dry-run`, `--uninstall`, `--force`, and `--entry npx|local`. Writes are atomic and snapshot the previous content into `<path>.backup`. Full reference: [INSTALL_CLI.md](./INSTALL_CLI.md).
+It supports `--claude` / `--codex` / `--cursor` / `--hermes` / `--all`, plus `--dry-run`, `--uninstall`, `--force`, and `--entry npx|local`. Writes are atomic and snapshot the previous content into `<path>.backup`. Full reference: [INSTALL_CLI.md](./INSTALL_CLI.md).
 
 ### Global vs project scope
 
@@ -32,6 +33,7 @@ npx @lyupro/skillforge-mcp install --all --scope project
 | Claude Code | `~/.claude.json` | `./.mcp.json` |
 | Codex CLI | `~/.codex/config.toml` | `./.codex/config.toml` |
 | Cursor | `~/.cursor/mcp.json` | `./.cursor/mcp.json` |
+| Hermes Agent | `~/.hermes/config.yaml` | `./.hermes/config.yaml` |
 
 `skillforge uninstall` accepts the same `--scope global|project` flag — pass the scope you installed with so the right config file is reverted.
 
@@ -159,7 +161,28 @@ For the latest Cursor-specific notes, see [INTEGRATION/cursor.md](./INTEGRATION/
 
 ---
 
-## 4. Manual MCP client
+## 4. Hermes Agent
+
+Hermes Agent stores MCP servers in a YAML config file under the top-level `mcp_servers` key:
+
+```bash
+npx @lyupro/skillforge-mcp install --hermes
+```
+
+Config lives in `~/.hermes/config.yaml` (or `$HERMES_HOME/config.yaml` when the env var is set). Pass `--scope project` to target `./.hermes/config.yaml` in the current directory instead.
+
+The installer writes a bare `command`/`args` entry with Hermes-specific `enabled`, `timeout`, and `connect_timeout` fields. It never touches the sibling top-level `mcp:` key (Hermes LLM provider config) or any other entries. After install, reload the MCP tool cache:
+
+- **CLI session:** run `/reload-mcp` or start a new session.
+- **Telegram gateway:** run `hermes gateway restart`.
+
+Verify: `hermes mcp list`, `hermes mcp test skillforge`.
+
+See [INTEGRATION/hermes.md](./INTEGRATION/hermes.md) for the full YAML snippet, the `hermes mcp add` interactive alternative, and troubleshooting notes.
+
+---
+
+## 5. Manual MCP client
 
 Any client that speaks MCP stdio over `@modelcontextprotocol/sdk` can connect:
 
@@ -250,7 +273,7 @@ pnpm build
 pnpm smoke
 ```
 
-The wiring in Claude Code / Codex / Cursor points at the same `dist/cli/dispatcher.js` absolute path — restarting the host session picks up the new build. Once published to npm, the upgrade flow becomes `npm install -g @lyupro/skillforge-mcp@latest` (or the equivalent for the host tool that fetched the package).
+The wiring in Claude Code / Codex / Cursor / Hermes points at the same `dist/cli/dispatcher.js` absolute path — restarting the host session picks up the new build. Once published to npm, the upgrade flow becomes `npm install -g @lyupro/skillforge-mcp@latest` (or the equivalent for the host tool that fetched the package).
 
 ---
 

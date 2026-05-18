@@ -2,6 +2,21 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-05-18
+
+A fourth host installer target: Hermes Agent.
+
+### Added
+
+- **`skillforge install --hermes`** — wires SkillForge into the Hermes Agent config. The installer edits the Hermes YAML config (`~/.hermes/config.yaml`, or `$HERMES_HOME/config.yaml`; `--scope project` targets `./.hermes/config.yaml`) and adds a `mcp_servers.skillforge` entry. The config is round-tripped through a comment-preserving YAML parser, so the sibling `mcp:` provider key, other servers, and operator comments survive the edit. The entry carries the Hermes-specific `enabled` / `timeout` / `connect_timeout` fields alongside `command` / `args`. `install --all` now auto-detects and installs into Hermes too; `--hermes --uninstall` and `--hermes --dry-run` work as for the other hosts.
+- A post-install reminder for Hermes — the host caches its MCP tool list, so a fresh install needs `/reload-mcp`, a new session, or `hermes gateway restart` before SkillForge appears.
+
+### Verified
+
+- 649 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## [1.4.2] — 2026-05-18
 
 A single canonical entry point and a registry-independent install default.

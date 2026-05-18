@@ -6,13 +6,13 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.4.1** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor, terminal `tools` + `folders` + `skills` subcommands, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 612 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.5.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `skills` subcommands, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 649 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
 ## What it is
 
-A standalone [Model Context Protocol](https://modelcontextprotocol.io) server that exposes Markdown-defined **skills** (prompts, templates, scripts) to any MCP-capable LLM tool — Claude Code, OpenAI Codex CLI, Cursor, or custom clients via `@modelcontextprotocol/sdk`.
+A standalone [Model Context Protocol](https://modelcontextprotocol.io) server that exposes Markdown-defined **skills** (prompts, templates, scripts) to any MCP-capable LLM tool — Claude Code, OpenAI Codex CLI, Cursor, Hermes Agent, or custom clients via `@modelcontextprotocol/sdk`.
 
 One skill folder. One config file. Any tool can ask for any skill on demand.
 
@@ -31,9 +31,9 @@ One skill folder. One config file. Any tool can ask for any skill on demand.
 npx @lyupro/skillforge-mcp install --all
 ```
 
-Auto-detects Claude Code, Codex CLI, and Cursor on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`.
+Auto-detects Claude Code, Codex CLI, Cursor, and Hermes Agent on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`.
 
-By default the installer edits each host's global config. Pass `--scope project` to wire SkillForge into a repo-local config rooted at the current directory instead — `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor):
+By default the installer edits each host's global config. Pass `--scope project` to wire SkillForge into a repo-local config rooted at the current directory instead — `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor), `.hermes/config.yaml` (Hermes Agent):
 
 ```bash
 npx @lyupro/skillforge-mcp install --all --scope project
@@ -83,7 +83,7 @@ After install, point SkillForge at your skill folder:
 > use skills__list
 ```
 
-See [docs/INSTALL.md](./docs/INSTALL.md) for Codex CLI, Cursor, and manual MCP-client setups.
+See [docs/INSTALL.md](./docs/INSTALL.md) for Codex CLI, Cursor, Hermes Agent, and manual MCP-client setups.
 
 ## Verify Installation
 
@@ -102,7 +102,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | Command | Purpose |
 |---------|---------|
 | `serve` | Run the stdio MCP server. Default when no command is given. |
-| `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor. Flags: `--claude` / `--codex` / `--cursor` / `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
+| `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor / Hermes Agent. Flags: `--claude` / `--codex` / `--cursor` / `--hermes` / `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry auto\|npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
 | `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
 | `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
 | `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `enable` / `disable` / `reset`. |
@@ -263,7 +263,7 @@ pnpm install
 pnpm build
 ```
 
-The wiring in Claude Code / Codex / Cursor points at the same binary path — restarting the host session picks up the new build. Your persisted config at `~/.lyupro/.skillforge/config.json` survives the upgrade.
+The wiring in Claude Code / Codex / Cursor / Hermes points at the same binary path — restarting the host session picks up the new build. Your persisted config at `~/.lyupro/.skillforge/config.json` survives the upgrade.
 
 ## Documentation
 
@@ -274,7 +274,7 @@ The wiring in Claude Code / Codex / Cursor points at the same binary path — re
 | [docs/CONFIGURATION.md](./docs/CONFIGURATION.md) | Power users — folder management, blacklist, sandbox config, env overrides |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Contributors — design patterns, module responsibilities, extension points |
 | [docs/SECURITY.md](./docs/SECURITY.md) | Security-conscious operators — threat model, audit checklist, sandbox limits, disclosure policy |
-| [docs/INTEGRATION/](./docs/INTEGRATION/) | Per-tool wiring guides (claude-code / codex / cursor / custom-llm-tools) |
+| [docs/INTEGRATION/](./docs/INTEGRATION/) | Per-tool wiring guides (claude-code / codex / cursor / hermes / custom-llm-tools) |
 | [skills/](./skills/) | 10 ready-to-use sample skills (prompt / script / hybrid examples) |
 | [examples/configs/](./examples/configs/) | Sample `config.json` files for common setups |
 

@@ -1,6 +1,6 @@
 # Install CLI
 
-One-command wiring of SkillForge MCP into Claude Code, Codex CLI, and Cursor. Shipped in **v1.1**. For managing the skill registry from the terminal (list, get, reload), see the `skillforge skills` subcommand — available since **v1.4**.
+One-command wiring of SkillForge MCP into Claude Code, Codex CLI, Cursor, and Hermes Agent. Shipped in **v1.1**. For managing the skill registry from the terminal (list, get, reload), see the `skillforge skills` subcommand — available since **v1.4**.
 
 ## Overview
 
@@ -17,6 +17,7 @@ npx @lyupro/skillforge-mcp install [flags]
 | `--claude` | Edit `~/.claude.json` |
 | `--codex` | Edit `~/.codex/config.toml` |
 | `--cursor` | Edit `~/.cursor/mcp.json` |
+| `--hermes` | Edit `~/.hermes/config.yaml` (or `$HERMES_HOME/config.yaml`) |
 | `--all` | Auto-detect installed hosts (binary on PATH or config file present) and install into every detected one |
 | `--dry-run` | Print the exact `before` and `after` content per host. No disk writes. |
 | `--uninstall` | Reverse a previous install — remove the `skillforge` entry, leave everything else untouched |
@@ -27,7 +28,7 @@ npx @lyupro/skillforge-mcp install [flags]
 | `--binary-path PATH` | Override the local-entry binary path (defaults to `<package>/dist/cli/dispatcher.js`) |
 | `--help`, `-h` | Show usage |
 
-At least one of `--claude`, `--codex`, `--cursor`, or `--all` is required.
+At least one of `--claude`, `--codex`, `--cursor`, `--hermes`, or `--all` is required.
 
 ## Examples
 
@@ -97,6 +98,29 @@ Cursor reads MCP servers from `~/.cursor/mcp.json` (global) — uniform across W
 
 Other entries under `mcpServers` and any unrelated top-level keys are preserved.
 
+### Hermes Agent — `~/.hermes/config.yaml`
+
+Hermes reads MCP servers from `~/.hermes/config.yaml` (global) or `$HERMES_HOME/config.yaml` when the env var is set. With `--scope project` the target is `./.hermes/config.yaml` in the current directory instead.
+
+The installer writes under the top-level `mcp_servers` key and never touches the sibling `mcp:` key (Hermes LLM provider config) or any other entries — the file is round-tripped through a comment-preserving YAML parser.
+
+```yaml
+mcp_servers:
+  skillforge:
+    command: npx
+    args:
+      - -y
+      - "@lyupro/skillforge-mcp"
+      - serve
+    enabled: true
+    timeout: 120
+    connect_timeout: 60
+```
+
+Other entries under `mcp_servers` and any unrelated top-level keys are preserved.
+
+After install, reload the MCP tool cache: run `/reload-mcp` in the CLI, or `hermes gateway restart` for the Telegram gateway. See [INTEGRATION/hermes.md](./INTEGRATION/hermes.md).
+
 ## Uninstalling
 
 `--uninstall` removes only the `skillforge` entry from the targeted hosts. Pass the same target flags as the install (or `--all`):
@@ -106,7 +130,7 @@ npx @lyupro/skillforge-mcp install --all --uninstall
 npx @lyupro/skillforge-mcp install --claude --uninstall
 ```
 
-The host's config file remains in place. If `skillforge` was the only MCP server entry, the surrounding `mcpServers` (Claude Code / Cursor) or `mcp_servers` (Codex CLI) object stays as an empty container.
+The host's config file remains in place. If `skillforge` was the only MCP server entry, the surrounding `mcpServers` (Claude Code / Cursor) or `mcp_servers` (Codex CLI / Hermes) object stays as an empty container.
 
 ## Backup and recovery
 
@@ -121,6 +145,9 @@ mv ~/.codex/config.toml.backup ~/.codex/config.toml
 
 # Cursor
 mv ~/.cursor/mcp.json.backup ~/.cursor/mcp.json
+
+# Hermes Agent
+mv ~/.hermes/config.yaml.backup ~/.hermes/config.yaml
 ```
 
 The CLI never deletes `.backup` files on its own — clean them up when you no longer need them.
@@ -132,7 +159,7 @@ The CLI never deletes `.backup` files on its own — clean them up when you no l
 | `[<host>] ALREADY-INSTALLED` | An entry named `skillforge` already exists | Re-run with `--force` to overwrite, or `--uninstall` first |
 | `[<host>] error: invalid JSON in "..."` | Host config file is corrupt | The CLI refuses to touch a corrupt file. Inspect the path the error points at and fix it before re-running |
 | `[<host>] error: EACCES` | Host config path is not writable | Check ownership/permissions on the file (or the parent directory if the file does not yet exist) |
-| `No supported hosts detected` | `--all` was used but no host binary is on PATH and no host config file exists | Pass `--claude` / `--codex` / `--cursor` explicitly to force-install regardless of detection |
-| Old entry still active after install | The host tool was running while you ran `install` | Restart the host (Claude Code session, Codex CLI session, Cursor app) |
+| `No supported hosts detected` | `--all` was used but no host binary is on PATH and no host config file exists | Pass `--claude` / `--codex` / `--cursor` / `--hermes` explicitly to force-install regardless of detection |
+| Old entry still active after install | The host tool was running while you ran `install` | Restart the host (Claude Code session, Codex CLI session, Cursor app, or Hermes session / gateway) |
 
 See [INSTALL.md](./INSTALL.md) for the underlying manual wiring steps that the CLI automates.

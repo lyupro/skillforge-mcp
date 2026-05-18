@@ -7,6 +7,21 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.5.0 — Hermes Agent install target
+
+**Release date:** 2026-05-18
+
+SkillForge now installs into a fourth host: Hermes Agent.
+
+- **`skillforge install --hermes`** edits the Hermes YAML config (`~/.hermes/config.yaml`, `$HERMES_HOME/config.yaml`, or `./.hermes/config.yaml` with `--scope project`) and adds a `mcp_servers.skillforge` entry — `command` / `args` plus the Hermes-specific `enabled` / `timeout` / `connect_timeout` fields. The config round-trips through a comment-preserving YAML parser, so the sibling `mcp:` provider block, other servers, and your comments are untouched. `install --all` picks up Hermes automatically.
+- After install, Hermes caches its MCP tool list — the CLI prints a reminder to reload (`/reload-mcp`, a new session, or `hermes gateway restart`).
+
+**Engineering snapshot**
+
+- 649 tests passing + 2 skipped; the Hermes installer shares the entry resolver and atomic-write helpers with the other three host installers.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## v1.4.2 — One canonical entry point, offline-safe installs
 
 **Release date:** 2026-05-18
