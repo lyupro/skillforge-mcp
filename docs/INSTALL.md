@@ -275,6 +275,28 @@ pnpm smoke
 
 The wiring in Claude Code / Codex / Cursor / Hermes points at the same `dist/cli/dispatcher.js` absolute path — restarting the host session picks up the new build. Once published to npm, the upgrade flow becomes `npm install -g @lyupro/skillforge-mcp@latest` (or the equivalent for the host tool that fetched the package).
 
+### Re-wire the host config when upgrading from before v1.4.2 (one-time)
+
+Upgrading the package only refreshes the code. The entry in your host
+config (`~/.claude.json`, Codex / Cursor / Hermes configs) is left
+untouched. If it was created by an installer before v1.4.2, it holds the
+old **npx-entry** (`command=npx`) — and on a host with `min-release-age`
+set in `~/.npmrc` the MCP server fails to connect (`-32000` /
+`ENOVERSIONS`), because `npx` re-resolves the package from the registry
+on every spawn and the registry filter hides the just-published version.
+
+Overwrite it with the binary-entry:
+
+```bash
+skillforge install --claude --force   # also --codex / --cursor / --hermes
+# then restart the host tool so it picks up the new entry
+```
+
+Since v1.4.2 the installer defaults to `--entry auto`, which writes a
+binary-entry (`command=node`, `args=[<abs dispatcher.js>, serve]`). The
+host then launches the server directly — no network, no npm resolve per
+spawn. This is a one-time step; later upgrades no longer need `--force`.
+
 ---
 
 ## Uninstall
@@ -311,3 +333,4 @@ And delete the cloned repo. That's everything — SkillForge writes nothing else
 | `skills__invoke` returns `scripts disabled for this skill` | Global flag is true, but skill is missing `allowScripts: true` in frontmatter | Add `allowScripts: true` to the skill's frontmatter. |
 | Skill body shows up unredacted but matches `eval(` / `shell=True` | `security.autoAudit: true` (default) and `auditPatterns` matched | Skill is excluded from the registry. Either fix the skill body or remove the pattern from `auditPatterns`. See [SECURITY.md](./SECURITY.md). |
 | Hot reload doesn't pick up new `.md` files | `watcher.enabled: false` in config OR file extension is not `.md` | Set `watcher.enabled: true` and ensure the file is `.md`. Use `skills__reload` to force a rescan manually. |
+| MCP server fails to connect (`-32000` / `ENOVERSIONS`) | Host config holds a pre-v1.4.2 npx-entry, and `min-release-age` in `~/.npmrc` hides the published version from `npx`'s per-spawn resolve | Re-wire to the binary-entry: `skillforge install --claude --force` (also `--codex` / `--cursor` / `--hermes`), then restart the host. See [Upgrade](#upgrade). |
