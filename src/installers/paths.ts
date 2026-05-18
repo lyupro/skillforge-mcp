@@ -44,13 +44,16 @@ export function cursorConfigPath(): string {
 }
 
 // Fallback `--entry local` target when --binary-path is not supplied.
-// Resolves to <package root>/dist/server.js via import.meta.url so the
-// path works whether the file is executed from dist/ or src/ (tsx).
+// Resolves to <package root>/dist/cli/dispatcher.js via import.meta.url so
+// the path works whether the file is executed from dist/ or src/ (tsx).
+// dispatcher.js is the single CLI entry point — invoked with `serve` it
+// starts the MCP stdio server. (The legacy dist/server.js path was retired
+// when the dispatcher landed.)
 export function defaultBinaryPath(): string {
   const here = fileURLToPath(import.meta.url);
   // here = <root>/(dist|src)/installers/paths.(js|ts)
-  // Resolve up three segments to reach the package root, then dist/server.js.
-  return resolve(here, '..', '..', '..', 'dist', 'server.js');
+  // Resolve up three segments to the package root, then dist/cli/dispatcher.js.
+  return resolve(here, '..', '..', '..', 'dist', 'cli', 'dispatcher.js');
 }
 
 export function defaultPaths(): PathOverrides {

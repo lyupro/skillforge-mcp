@@ -109,7 +109,10 @@ describe('CodexInstaller.install', () => {
       mcp_servers: { skillforge: { command: string; args: string[] } };
     };
     expect(written.mcp_servers.skillforge.command).toBe('node');
-    expect(written.mcp_servers.skillforge.args).toEqual(['/fake/skillforge/dist/server.js']);
+    expect(written.mcp_servers.skillforge.args).toEqual([
+      '/fake/skillforge/dist/server.js',
+      'serve',
+    ]);
   });
 });
 

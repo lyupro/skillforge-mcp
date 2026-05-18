@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { readJsonSafe, writeJsonAtomic } from './atomic-write.js';
 import { cursorConfigPath, defaultBinaryPath } from './paths.js';
+import { buildEntry, type ServerEntry } from './entry.js';
 import type {
   Installer,
   InstallOptions,
@@ -22,7 +23,6 @@ import type {
 } from './types.js';
 
 const SKILL_KEY = 'skillforge';
-const NPX_PKG = '@lyupro/skillforge-mcp';
 
 export interface CursorInstallerPathOverrides {
   configPath?: string;
@@ -30,22 +30,9 @@ export interface CursorInstallerPathOverrides {
   binaryProbe?: () => boolean;
 }
 
-interface ServerEntry {
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-}
-
 interface CursorConfig {
   mcpServers?: Record<string, ServerEntry>;
   [key: string]: unknown;
-}
-
-function buildEntry(opts: InstallOptions, binaryFallback: string): ServerEntry {
-  if (opts.entry === 'npx') {
-    return { command: 'npx', args: ['-y', NPX_PKG, 'serve'] };
-  }
-  return { command: 'node', args: [opts.binaryPath ?? binaryFallback] };
 }
 
 function probeCursorBinary(): boolean {

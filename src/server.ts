@@ -1,9 +1,10 @@
-#!/usr/bin/env node
 /**
- * SkillForge MCP — stdio entry point.
+ * SkillForge MCP — server module.
  *
- * buildServer() and buildDeps() are exported for integration tests so the
- * same wiring is exercised in-process without spawning a subprocess.
+ * Exports the server wiring: buildServer() + buildDeps() (also used by the
+ * integration tests for in-process exercise) and startServer(), the single
+ * server-start sequence. This file is a pure module — it is never run
+ * directly; the canonical entry point is dist/cli/dispatcher.js (`serve`).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -222,22 +223,16 @@ export async function buildDeps(): Promise<ServerDeps> {
   return deps;
 }
 
-async function main(): Promise<void> {
+/**
+ * Start the MCP stdio server: build deps, register tools, connect the stdio
+ * transport, then start the runtime watchers and shutdown handlers. This is
+ * the single server-start sequence — the dispatcher's `serve` command calls
+ * it, and nothing else does.
+ */
+export async function startServer(): Promise<void> {
   const deps = await buildDeps();
   const server = buildServer(deps);
   await server.connect(new StdioServerTransport());
   await startRuntime(deps);
   registerShutdown(deps);
-}
-
-// Only run main() when invoked directly, not when imported by tests.
-// This is the canonical ESM "is this the entry point?" check.
-import { fileURLToPath } from 'node:url';
-const isDirectRun =
-  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
-if (isDirectRun) {
-  main().catch((err) => {
-    console.error('[skillforge] fatal:', err);
-    process.exit(1);
-  });
 }

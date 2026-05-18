@@ -42,10 +42,10 @@ describe('paths', () => {
     expect(p.replace(/\\/g, '/').endsWith('/.cursor/mcp.json')).toBe(true);
   });
 
-  it('defaultBinaryPath ends with dist/server.js', async () => {
+  it('defaultBinaryPath ends with dist/cli/dispatcher.js', async () => {
     const { defaultBinaryPath } = await import('./paths.js');
     const p = defaultBinaryPath().replace(/\\/g, '/');
-    expect(p.endsWith('/dist/server.js')).toBe(true);
+    expect(p.endsWith('/dist/cli/dispatcher.js')).toBe(true);
   });
 
   it('defaultPaths returns all four resolved paths', async () => {

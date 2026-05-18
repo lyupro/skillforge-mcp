@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { readJsonSafe, writeJsonAtomic } from './atomic-write.js';
 import { claudeConfigPath, defaultBinaryPath } from './paths.js';
+import { buildEntry, type ServerEntry } from './entry.js';
 import type {
   Installer,
   InstallOptions,
@@ -20,7 +21,6 @@ import type {
 } from './types.js';
 
 const SKILL_KEY = 'skillforge';
-const NPX_PKG = '@lyupro/skillforge-mcp';
 
 export interface ClaudeInstallerPathOverrides {
   configPath?: string;
@@ -31,20 +31,6 @@ export interface ClaudeInstallerPathOverrides {
 interface ClaudeConfig {
   mcpServers?: Record<string, ServerEntry>;
   [key: string]: unknown;
-}
-
-interface ServerEntry {
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-}
-
-function buildEntry(opts: InstallOptions, binaryFallback: string): ServerEntry {
-  if (opts.entry === 'npx') {
-    return { command: 'npx', args: ['-y', NPX_PKG, 'serve'] };
-  }
-  const binary = opts.binaryPath ?? binaryFallback;
-  return { command: 'node', args: [binary] };
 }
 
 function probeClaudeBinary(): boolean {

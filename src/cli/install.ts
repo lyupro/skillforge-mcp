@@ -33,7 +33,7 @@ export interface ParsedArgs {
   dryRun: boolean;
   uninstall: boolean;
   force: boolean;
-  entry: 'npx' | 'local';
+  entry: 'npx' | 'local' | 'auto';
   binaryPath?: string;
   scope: Scope;
   showHelp: boolean;
@@ -63,9 +63,12 @@ Modes:
   --force             Overwrite an existing SkillForge entry
 
 Entry shape:
-  --entry npx         (default) command=npx args=['-y','@lyupro/skillforge-mcp','serve']
-  --entry local       command=node args=[<binary-path>]
-  --binary-path PATH  Override the local-entry binary path (defaults to dist/server.js)
+  --entry auto        (default) detect this installer's own on-disk location:
+                        stable install     → command=node args=[<dispatcher.js>,'serve']
+                        ephemeral npx run   → command=npx  args=['-y','@lyupro/skillforge-mcp','serve']
+  --entry npx         force command=npx  args=['-y','@lyupro/skillforge-mcp','serve']
+  --entry local       force command=node args=[<binary-path>,'serve']
+  --binary-path PATH  Override the binary path (defaults to dist/cli/dispatcher.js)
 
 Scope:
   --scope global      (default) edit the host's home-directory config:
@@ -89,7 +92,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     dryRun: false,
     uninstall: false,
     force: false,
-    entry: 'npx',
+    entry: 'auto',
     scope: 'global',
     showHelp: false,
   };
@@ -124,8 +127,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--entry': {
         const next = argv[++i];
-        if (next !== 'npx' && next !== 'local') {
-          throw new UsageError(`--entry must be 'npx' or 'local' (got: ${String(next)})`);
+        if (next !== 'npx' && next !== 'local' && next !== 'auto') {
+          throw new UsageError(`--entry must be 'auto', 'npx', or 'local' (got: ${String(next)})`);
         }
         out.entry = next;
         break;

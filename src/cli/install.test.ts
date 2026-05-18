@@ -94,6 +94,14 @@ describe('parseArgs', () => {
     expect(args.binaryPath).toBe('/abs/server.js');
   });
 
+  it('defaults entry to auto', () => {
+    expect(parseArgs(['--claude']).entry).toBe('auto');
+  });
+
+  it('parses --entry auto', () => {
+    expect(parseArgs(['--all', '--entry', 'auto']).entry).toBe('auto');
+  });
+
   it('rejects unknown flag with UsageError', () => {
     expect(() => parseArgs(['--bogus'])).toThrow(UsageError);
   });
@@ -367,7 +375,9 @@ describe('--scope end-to-end (real installers, temp cwd)', () => {
 
   it('--scope project writes Claude config to ./.mcp.json in cwd', async () => {
     const cap = makeCapture();
-    const code = await runInstall(parseArgs(['--claude', '--scope', 'project']), {
+    // Force --entry npx so the asserted entry shape is deterministic — this
+    // test verifies project-vs-global path routing, not entry resolution.
+    const code = await runInstall(parseArgs(['--claude', '--scope', 'project', '--entry', 'npx']), {
       stdout: cap.stdout,
       stderr: cap.stderr,
     });

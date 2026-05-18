@@ -106,14 +106,17 @@ describe('ClaudeInstaller.install', () => {
     await inst.install({ entry: 'local' });
     const written = JSON.parse(readFileSync(configPath, 'utf8'));
     expect(written.mcpServers.skillforge.command).toBe('node');
-    expect(written.mcpServers.skillforge.args).toEqual(['/fake/skillforge/dist/server.js']);
+    expect(written.mcpServers.skillforge.args).toEqual([
+      '/fake/skillforge/dist/server.js',
+      'serve',
+    ]);
   });
 
   it('respects custom binaryPath override on install opts', async () => {
     const inst = makeInstaller();
     await inst.install({ entry: 'local', binaryPath: '/explicit/server.js' });
     const written = JSON.parse(readFileSync(configPath, 'utf8'));
-    expect(written.mcpServers.skillforge.args).toEqual(['/explicit/server.js']);
+    expect(written.mcpServers.skillforge.args).toEqual(['/explicit/server.js', 'serve']);
   });
 });
 

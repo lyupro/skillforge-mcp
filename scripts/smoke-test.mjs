@@ -2,8 +2,8 @@
 /**
  * Subprocess smoke test for the built SkillForge MCP server.
  *
- * Spawns `node dist/server.js`, connects via StdioClientTransport, lists tools,
- * calls each one against a tiny tmp-folder fixture, exits 0 on success.
+ * Spawns `node dist/cli/dispatcher.js serve`, connects via StdioClientTransport,
+ * lists tools, calls each one against a tiny tmp-folder fixture, exits 0 on success.
  *
  * Use after `pnpm build` to verify the binary is callable end-to-end, separate
  * from the in-process integration test (which uses InMemoryTransport).
@@ -18,7 +18,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
-const SERVER_PATH = join(REPO_ROOT, 'dist', 'server.js');
+const DISPATCHER_PATH = join(REPO_ROOT, 'dist', 'cli', 'dispatcher.js');
 
 const FIXTURE_SKILL = `---
 name: smoke-skill
@@ -48,7 +48,7 @@ async function main() {
 
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [SERVER_PATH],
+    args: [DISPATCHER_PATH, 'serve'],
     env: { ...process.env, SKILLFORGE_FOLDERS: fixture.skillDir },
   });
 

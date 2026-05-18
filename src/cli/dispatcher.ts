@@ -115,16 +115,8 @@ export interface ServeDeps {
 }
 
 async function defaultStartServe(): Promise<void> {
-  const { buildDeps, buildServer } = await import('../server.js');
-  const { startRuntime, registerShutdown } = await import('../runtime.js');
-  const { StdioServerTransport } = await import(
-    '@modelcontextprotocol/sdk/server/stdio.js'
-  );
-  const deps = await buildDeps();
-  const server = buildServer(deps);
-  await server.connect(new StdioServerTransport());
-  await startRuntime(deps);
-  registerShutdown(deps);
+  const { startServer } = await import('../server.js');
+  await startServer();
 }
 
 /**
