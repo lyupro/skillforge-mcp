@@ -15,6 +15,7 @@ export interface PathOverrides {
   claudeConfigPath: string;
   codexConfigPath: string;
   cursorConfigPath: string;
+  hermesConfigPath: string;
   defaultBinaryPath: string;
 }
 
@@ -25,7 +26,7 @@ export interface PathOverrides {
  */
 export type Scope = 'global' | 'project';
 
-export type HostName = 'claude' | 'codex' | 'cursor';
+export type HostName = 'claude' | 'codex' | 'cursor' | 'hermes';
 
 export function claudeConfigPath(): string {
   return join(homedir(), '.claude.json');
@@ -41,6 +42,18 @@ export function codexConfigPath(): string {
 // does NOT read MCP servers from.
 export function cursorConfigPath(): string {
   return join(homedir(), '.cursor', 'mcp.json');
+}
+
+// Hermes stores its config as YAML. The location honors the HERMES_HOME
+// environment variable when set (Hermes profiles / non-standard home);
+// otherwise it falls back to ~/.hermes/config.yaml. MCP servers live under
+// the top-level `mcp_servers` key — distinct from the `mcp:` provider key.
+export function hermesConfigPath(): string {
+  const home = process.env.HERMES_HOME;
+  if (home !== undefined && home.trim() !== '') {
+    return join(home, 'config.yaml');
+  }
+  return join(homedir(), '.hermes', 'config.yaml');
 }
 
 // Fallback `--entry local` target when --binary-path is not supplied.
@@ -61,6 +74,7 @@ export function defaultPaths(): PathOverrides {
     claudeConfigPath: claudeConfigPath(),
     codexConfigPath: codexConfigPath(),
     cursorConfigPath: cursorConfigPath(),
+    hermesConfigPath: hermesConfigPath(),
     defaultBinaryPath: defaultBinaryPath(),
   };
 }
@@ -89,6 +103,12 @@ export function codexProjectConfigPath(projectRoot: string): string {
 // the existing merge logic is reused verbatim.
 export function cursorProjectConfigPath(projectRoot: string): string {
   return join(projectRoot, '.cursor', 'mcp.json');
+}
+
+// Hermes reads project-local config from `.hermes/config.yaml` at the repo
+// root, the same YAML `mcp_servers` shape as the global `~/.hermes/config.yaml`.
+export function hermesProjectConfigPath(projectRoot: string): string {
+  return join(projectRoot, '.hermes', 'config.yaml');
 }
 
 /**
@@ -126,10 +146,12 @@ export function resolveConfigPath(
   if (scope === 'global') {
     if (host === 'claude') return claudeConfigPath();
     if (host === 'codex') return codexConfigPath();
-    return cursorConfigPath();
+    if (host === 'cursor') return cursorConfigPath();
+    return hermesConfigPath();
   }
   assertProjectRoot(projectRoot);
   if (host === 'claude') return claudeProjectConfigPath(projectRoot);
   if (host === 'codex') return codexProjectConfigPath(projectRoot);
-  return cursorProjectConfigPath(projectRoot);
+  if (host === 'cursor') return cursorProjectConfigPath(projectRoot);
+  return hermesProjectConfigPath(projectRoot);
 }

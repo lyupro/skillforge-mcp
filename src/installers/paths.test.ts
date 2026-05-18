@@ -9,11 +9,12 @@ describe('paths', () => {
     vi.resetModules();
   });
 
-  it('exposes the four expected helpers', async () => {
+  it('exposes the host config-path helpers', async () => {
     const mod = await import('./paths.js');
     expect(typeof mod.claudeConfigPath).toBe('function');
     expect(typeof mod.codexConfigPath).toBe('function');
     expect(typeof mod.cursorConfigPath).toBe('function');
+    expect(typeof mod.hermesConfigPath).toBe('function');
     expect(typeof mod.defaultBinaryPath).toBe('function');
     expect(typeof mod.defaultPaths).toBe('function');
   });
@@ -42,6 +43,32 @@ describe('paths', () => {
     expect(p.replace(/\\/g, '/').endsWith('/.cursor/mcp.json')).toBe(true);
   });
 
+  it('hermesConfigPath resolves under homedir/.hermes/config.yaml', async () => {
+    const { hermesConfigPath } = await import('./paths.js');
+    const { homedir } = await import('node:os');
+    const prev = process.env.HERMES_HOME;
+    delete process.env.HERMES_HOME;
+    try {
+      const p = hermesConfigPath();
+      expect(p.startsWith(homedir())).toBe(true);
+      expect(p.replace(/\\/g, '/').endsWith('/.hermes/config.yaml')).toBe(true);
+    } finally {
+      if (prev !== undefined) process.env.HERMES_HOME = prev;
+    }
+  });
+
+  it('hermesConfigPath honors HERMES_HOME when set', async () => {
+    const { hermesConfigPath } = await import('./paths.js');
+    const prev = process.env.HERMES_HOME;
+    process.env.HERMES_HOME = '/custom/hermes-home';
+    try {
+      expect(hermesConfigPath().replace(/\\/g, '/')).toBe('/custom/hermes-home/config.yaml');
+    } finally {
+      if (prev === undefined) delete process.env.HERMES_HOME;
+      else process.env.HERMES_HOME = prev;
+    }
+  });
+
   it('defaultBinaryPath ends with dist/cli/dispatcher.js', async () => {
     const { defaultBinaryPath } = await import('./paths.js');
     const p = defaultBinaryPath().replace(/\\/g, '/');
@@ -54,6 +81,7 @@ describe('paths', () => {
     expect(typeof all.claudeConfigPath).toBe('string');
     expect(typeof all.codexConfigPath).toBe('string');
     expect(typeof all.cursorConfigPath).toBe('string');
+    expect(typeof all.hermesConfigPath).toBe('string');
     expect(typeof all.defaultBinaryPath).toBe('string');
   });
 });
@@ -75,6 +103,12 @@ describe('project-scoped paths', () => {
     const { cursorProjectConfigPath } = await import('./paths.js');
     const p = cursorProjectConfigPath('/repo').replace(/\\/g, '/');
     expect(p).toBe('/repo/.cursor/mcp.json');
+  });
+
+  it('hermesProjectConfigPath resolves to <root>/.hermes/config.yaml', async () => {
+    const { hermesProjectConfigPath } = await import('./paths.js');
+    const p = hermesProjectConfigPath('/repo').replace(/\\/g, '/');
+    expect(p).toBe('/repo/.hermes/config.yaml');
   });
 });
 
@@ -119,9 +153,12 @@ describe('assertProjectRoot', () => {
 
 describe('resolveConfigPath', () => {
   it('global scope routes to home-directory config per host', async () => {
-    const { resolveConfigPath, claudeConfigPath, codexConfigPath } = await import('./paths.js');
+    const { resolveConfigPath, claudeConfigPath, codexConfigPath, cursorConfigPath, hermesConfigPath } =
+      await import('./paths.js');
     expect(resolveConfigPath('claude', 'global')).toBe(claudeConfigPath());
     expect(resolveConfigPath('codex', 'global')).toBe(codexConfigPath());
+    expect(resolveConfigPath('cursor', 'global')).toBe(cursorConfigPath());
+    expect(resolveConfigPath('hermes', 'global')).toBe(hermesConfigPath());
   });
 
   it('project scope routes to repo-local config per host', async () => {
@@ -139,6 +176,9 @@ describe('resolveConfigPath', () => {
       );
       expect(resolveConfigPath('cursor', 'project', dir).replace(/\\/g, '/')).toBe(
         `${dir.replace(/\\/g, '/')}/.cursor/mcp.json`,
+      );
+      expect(resolveConfigPath('hermes', 'project', dir).replace(/\\/g, '/')).toBe(
+        `${dir.replace(/\\/g, '/')}/.hermes/config.yaml`,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
