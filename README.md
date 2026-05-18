@@ -289,14 +289,14 @@ pnpm install
 pnpm build
 
 # Wire into Claude Code using the absolute path
-claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js
+claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 Development commands:
 
 ```bash
 pnpm install
-pnpm dev           # tsx watch src/server.ts
+pnpm dev           # tsx watch src/cli/dispatcher.ts serve
 pnpm test          # vitest run
 pnpm test:coverage # coverage report
 pnpm lint          # tsc --noEmit

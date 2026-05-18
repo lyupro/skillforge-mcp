@@ -25,7 +25,7 @@ pnpm test         # 532 passing + 1 win32-skip
 pnpm lint         # tsc --noEmit
 pnpm check:size   # all source files ≤ 400 lines
 pnpm build        # tsc -p tsconfig.json — produces dist/
-pnpm smoke        # subprocess end-to-end via dist/server.js
+pnpm smoke        # subprocess end-to-end via dist/cli/dispatcher.js serve
 ```
 
 All five gates must exit zero. If any gate fails, **do not publish**; fix on master first.

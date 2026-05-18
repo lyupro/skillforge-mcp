@@ -29,7 +29,7 @@ Goals: replace per-tool auto-loading of 100+ skills with lazy-by-design MCP disc
 
 ```
 src/
-├── server.ts                # MCP stdio entry point — buildServer/buildDeps
+├── server.ts                # MCP server module — buildServer/buildDeps/startServer
 ├── core/                    # SkillRegistry, SkillResolver, caches, errors (CyclicSkillDependencyError), shared types
 ├── parser/                  # FrontmatterParser, FileScanner, FormatDetector, ScriptsDirDetector
 ├── handlers/                # invocation-strategy + prompt-strategy + script-strategy + hybrid-strategy + composite-resolver
@@ -62,14 +62,14 @@ src/
 
 ```bash
 pnpm install            # install deps
-pnpm dev                # tsx watch src/server.ts (development)
+pnpm dev                # tsx watch src/cli/dispatcher.ts serve (development)
 pnpm test               # vitest run (one-shot)
 pnpm test:watch         # vitest in watch mode
 pnpm test:coverage      # coverage with 80% gate
 pnpm lint               # tsc --noEmit (type-check)
 pnpm check:size         # file-size gate (<=400 lines)
 pnpm build              # emit dist/ (tsc -p tsconfig.json)
-pnpm smoke              # subprocess smoke test against dist/server.js
+pnpm smoke              # subprocess smoke test against dist/cli/dispatcher.js
 ```
 
 ## Verification protocol
@@ -79,7 +79,7 @@ After meaningful changes:
 1. `pnpm lint` — type-check passes.
 2. `pnpm test` — all tests pass (currently 370 + 1 win32-skip, including in-process integration via InMemoryTransport covering composite invocation, cycle detection, and the real-frontmatter promotion path for `scripts:` / `cacheable:` / `cacheTtlMs:`).
 3. `pnpm check:size` — no file over 400 lines.
-4. For MCP-protocol or `src/server.ts` / `src/tools/` changes: `pnpm build && pnpm smoke` — spawns the actual `dist/server.js` binary and exercises all three tools via a real `StdioClientTransport`. This catches build / module-resolution / shebang issues that the in-process integration test cannot.
+4. For MCP-protocol or `src/server.ts` / `src/tools/` changes: `pnpm build && pnpm smoke` — spawns the actual `dist/cli/dispatcher.js serve` entry point and exercises all three tools via a real `StdioClientTransport`. This catches build / module-resolution / shebang issues that the in-process integration test cannot.
 
 ## Git policy
 

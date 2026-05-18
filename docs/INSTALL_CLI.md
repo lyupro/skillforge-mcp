@@ -21,9 +21,10 @@ npx @lyupro/skillforge-mcp install [flags]
 | `--dry-run` | Print the exact `before` and `after` content per host. No disk writes. |
 | `--uninstall` | Reverse a previous install — remove the `skillforge` entry, leave everything else untouched |
 | `--force` | Overwrite an existing `skillforge` entry (default is to refuse with `already-installed`) |
-| `--entry npx` | Default. Writes `{ command: "npx", args: ["-y", "@lyupro/skillforge-mcp"] }` |
-| `--entry local` | Writes `{ command: "node", args: ["<binary-path>"] }` |
-| `--binary-path PATH` | Override the local-entry binary path (defaults to `<package>/dist/server.js`) |
+| `--entry auto` | Default. Detects how the installer runs: a stable install writes `{ command: "node", args: ["<absolute dist/cli/dispatcher.js>", "serve"] }`; a one-shot `npx … install` run falls back to `{ command: "npx", args: ["-y", "@lyupro/skillforge-mcp", "serve"] }` |
+| `--entry npx` | Explicit override. Writes `{ command: "npx", args: ["-y", "@lyupro/skillforge-mcp", "serve"] }` |
+| `--entry local` | Explicit override. Writes `{ command: "node", args: ["<binary-path>", "serve"] }` |
+| `--binary-path PATH` | Override the local-entry binary path (defaults to `<package>/dist/cli/dispatcher.js`) |
 | `--help`, `-h` | Show usage |
 
 At least one of `--claude`, `--codex`, `--cursor`, or `--all` is required.
@@ -44,7 +45,7 @@ npx @lyupro/skillforge-mcp install --all
 npx @lyupro/skillforge-mcp install --all --dry-run
 
 # Use a local build instead of the published npm package
-npx @lyupro/skillforge-mcp install --all --entry local --binary-path /abs/skillforge-mcp/dist/server.js
+npx @lyupro/skillforge-mcp install --all --entry local --binary-path /abs/skillforge-mcp/dist/cli/dispatcher.js
 
 # Force-overwrite a stale entry
 npx @lyupro/skillforge-mcp install --claude --force

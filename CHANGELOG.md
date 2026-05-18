@@ -2,6 +2,26 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] — 2026-05-18
+
+A single canonical entry point and a registry-independent install default.
+
+### Added
+
+- **`--entry auto` — the new default for `skillforge install`** (`src/installers/entry.ts`). The previous default, `--entry npx`, wrote `command=npx args=['-y','@lyupro/skillforge-mcp','serve']`, which re-resolves the package from the npm registry on every server spawn. On a machine with a registry cooldown policy (`min-release-age` in `.npmrc`) or no network, that resolution fails and the server does not start. `--entry auto` inspects the installer's own on-disk location: a stable install writes `command=node args=[<absolute dist/cli/dispatcher.js>,'serve']` — no registry, no network, offline-safe; a one-shot `npx … install` run (no stable file to point at) falls back to an npx entry. `--entry npx` and `--entry local` remain available as explicit overrides.
+
+### Changed
+
+- **One canonical entry point.** `dist/cli/dispatcher.js` is the single entry point — run it with `serve` (its default subcommand) to start the MCP stdio server. `src/server.ts` is now a pure module (`buildServer` / `buildDeps` / `startServer`) and is no longer directly runnable. The server-start sequence, previously duplicated between `server.ts` and the dispatcher, now lives in one exported `startServer()`.
+- **Installer entries target the canonical dispatcher.** `skillforge install` (`--entry auto` and `--entry local`) now points host configs at `dist/cli/dispatcher.js` with an explicit `serve` argument, instead of the internal `dist/server.js` module. The default `--binary-path` is `dist/cli/dispatcher.js`.
+- The three host installers (Claude Code / Codex CLI / Cursor) share a single entry-resolution module (`src/installers/entry.ts`) instead of each carrying its own copy of the entry-building logic.
+
+### Verified
+
+- 627 tests passing + 2 skipped (sandbox + a win32-only symlink skip).
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes against `dist/cli/dispatcher.js serve`.
+- All source files ≤ 400 lines.
+
 ## [1.4.1] — 2026-05-18
 
 A fix for the CLI silently doing nothing under a global install.

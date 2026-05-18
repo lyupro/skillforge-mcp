@@ -7,7 +7,7 @@ Codex CLI gained MCP support in May 2026. SkillForge works through Codex's stand
 After the build step from [INSTALL.md](../INSTALL.md):
 
 ```bash
-codex mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js
+codex mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 After publication on npm:
@@ -30,7 +30,7 @@ Example:
 ```toml
 [mcp_servers.skillforge]
 command = "node"
-args = ["/absolute/path/to/skillforge-mcp/dist/server.js"]
+args = ["/absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js", "serve"]
 
 [mcp_servers.skillforge.env]
 SKILLFORGE_FOLDERS = "/home/me/skills:/home/me/team-skills"
@@ -43,7 +43,7 @@ SKILLFORGE_TTL_MS = "120000"
 codex mcp add skillforge \
   --env SKILLFORGE_FOLDERS=/home/me/skills \
   --env SKILLFORGE_TTL_MS=120000 \
-  -- node /absolute/path/to/skillforge-mcp/dist/server.js
+  -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 Codex's `--env` flag adds entries to the `[mcp_servers.skillforge.env]` table.
@@ -102,7 +102,7 @@ Codex's resolution order is project-scoped first, falling through to global. Sam
 ### MCP registration
 
 ```
-codex mcp add skillforge -- node "c:/…/skillforge-mcp/dist/server.js"
+codex mcp add skillforge -- node "c:/…/skillforge-mcp/dist/cli/dispatcher.js" serve
 # → Added global MCP server 'skillforge'.
 ```
 
@@ -111,14 +111,14 @@ codex mcp add skillforge -- node "c:/…/skillforge-mcp/dist/server.js"
 ```toml
 [mcp_servers.skillforge]
 command = "node"
-args = ["c:/…/skillforge-mcp/dist/server.js"]
+args = ["c:/…/skillforge-mcp/dist/cli/dispatcher.js", "serve"]
 ```
 
 ### Server list confirmation
 
 ```
 codex mcp list
-# skillforge  node  c:/…/dist/server.js  …  enabled  Unsupported
+# skillforge  node  c:/…/dist/cli/dispatcher.js  …  enabled  Unsupported
 ```
 
 `Unsupported` in the Auth column is expected — SkillForge uses no OAuth/API-key auth layer.

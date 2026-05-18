@@ -1,6 +1,6 @@
 {
   "name": "@lyupro/skillforge-mcp",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Universal Skills MCP Server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
   "keywords": [
     "mcp",
@@ -41,8 +41,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
+    "dev": "tsx watch src/cli/dispatcher.ts serve",
+    "start": "node dist/cli/dispatcher.js serve",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

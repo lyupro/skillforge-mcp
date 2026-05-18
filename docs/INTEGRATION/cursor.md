@@ -24,7 +24,7 @@ Edit `~/.cursor/mcp.json` (global) — create the file if it does not exist:
   "mcpServers": {
     "skillforge": {
       "command": "node",
-      "args": ["/absolute/path/to/skillforge-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js", "serve"],
       "env": {
         "SKILLFORGE_FOLDERS": "/home/me/skills",
         "SKILLFORGE_TTL_MS": "120000"
@@ -40,7 +40,7 @@ Edit `~/.cursor/mcp.json` (global) — create the file if it does not exist:
 >   "mcpServers": {
 >     "skillforge": {
 >       "command": "node",
->       "args": ["C:\\Users\\you\\skillforge-mcp\\dist\\server.js"],
+>       "args": ["C:\\Users\\you\\skillforge-mcp\\dist\\cli\\dispatcher.js", "serve"],
 >       "env": {
 >         "SKILLFORGE_FOLDERS": "C:\\Users\\you\\skills"
 >       }
@@ -104,6 +104,6 @@ Cursor supports per-workspace MCP settings via `.cursor/mcp.json` at the project
 
 **Status: docs-only — end-to-end pending.**
 
-Cursor is not installed in the maintainer's local environment. The `mcpServers` config schema and the `~/.cursor/mcp.json` / `.cursor/mcp.json` file locations above were verified against the official Cursor docs (https://cursor.com/docs/mcp, retrieved 2026-05-16). The `{ command, args, env }` shape is identical to the MCP stdio transport format confirmed working in Claude Code and Codex CLI — the same SkillForge `dist/server.js` binary works with any MCP-stdio client.
+Cursor is not installed in the maintainer's local environment. The `mcpServers` config schema and the `~/.cursor/mcp.json` / `.cursor/mcp.json` file locations above were verified against the official Cursor docs (https://cursor.com/docs/mcp, retrieved 2026-05-16). The `{ command, args, env }` shape is identical to the MCP stdio transport format confirmed working in Claude Code and Codex CLI — the same SkillForge `dist/cli/dispatcher.js` entry point works with any MCP-stdio client.
 
 If you wire SkillForge into Cursor and confirm it works, please open a PR updating this section with your Cursor version and the output of Cursor's MCP server status panel.

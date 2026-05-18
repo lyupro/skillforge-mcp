@@ -35,12 +35,12 @@ pnpm build
 pnpm smoke              # verify the binary works before pointing Claude Code at it
 
 # Absolute path to the built server (use this in the next command)
-realpath dist/server.js                                    # macOS / Linux
-$(Get-Item dist/server.js).FullName                        # Windows PowerShell
+realpath dist/cli/dispatcher.js                            # macOS / Linux
+$(Get-Item dist/cli/dispatcher.js).FullName                # Windows PowerShell
 ```
 
 ```bash
-claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js
+claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 ## Verify
@@ -66,7 +66,7 @@ In a session:
 claude mcp add skillforge \
   --env SKILLFORGE_FOLDERS=/home/me/skills:/home/me/team-skills \
   --env SKILLFORGE_TTL_MS=120000 \
-  -- node /absolute/path/to/skillforge-mcp/dist/server.js
+  -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 `SKILLFORGE_FOLDERS` uses platform-native separator (`:` on POSIX, `;` on Windows).
@@ -110,8 +110,8 @@ pnpm build    # tsc -p tsconfig.json — exits 0, no errors
 ### MCP registration
 
 ```
-claude mcp add skillforge -- node "c:/…/skillforge-mcp/dist/server.js"
-# → Added stdio MCP server skillforge with command: node …/dist/server.js to local config
+claude mcp add skillforge -- node "c:/…/skillforge-mcp/dist/cli/dispatcher.js" serve
+# → Added stdio MCP server skillforge with command: node …/dist/cli/dispatcher.js to local config
 # → File modified: …/.claude.json [project: …/your-project]
 ```
 
@@ -119,7 +119,7 @@ claude mcp add skillforge -- node "c:/…/skillforge-mcp/dist/server.js"
 
 ```
 claude mcp list
-# skillforge: node …/dist/server.js  — ✓ Connected
+# skillforge: node …/dist/cli/dispatcher.js serve  — ✓ Connected
 ```
 
 All five tools confirmed present via `mcp list`:

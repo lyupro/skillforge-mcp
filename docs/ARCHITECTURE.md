@@ -16,7 +16,7 @@ Every MCP tool call follows the same path: the tool handler in `src/tools/` read
 
 ```
 src/
-├── server.ts                    ← MCP stdio entry — buildServer / buildDeps / main
+├── server.ts                    ← MCP server module — buildServer / buildDeps / startServer
 ├── server-deps.ts               ← ServerDeps interface (the DI surface)
 ├── config.ts                    ← loadResolvedConfig + buildPatternScanner (env + persisted merge)
 │
@@ -73,7 +73,7 @@ src/
     └── reload.ts                ← skills__reload — manual rescan with errorSink
 ```
 
-Every `*.ts` has a colocated `*.test.ts` (or its tests live in a parent `*.test.ts`). Integration tests run via `InMemoryTransport` in `tests/integration/server.test.ts`. The subprocess smoke test lives in `scripts/smoke-test.mjs` and spawns the real `dist/server.js` via `StdioClientTransport`.
+Every `*.ts` has a colocated `*.test.ts` (or its tests live in a parent `*.test.ts`). Integration tests run via `InMemoryTransport` in `tests/integration/server.test.ts`. The subprocess smoke test lives in `scripts/smoke-test.mjs` and spawns the real `dist/cli/dispatcher.js serve` via `StdioClientTransport`.
 
 ---
 

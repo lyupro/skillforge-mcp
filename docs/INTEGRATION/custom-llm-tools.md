@@ -10,7 +10,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const transport = new StdioClientTransport({
   command: 'node',
-  args: ['/absolute/path/to/skillforge-mcp/dist/server.js'],
+  args: ['/absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js', 'serve'],
   env: {
     PATH: process.env.PATH ?? '',
     SKILLFORGE_FOLDERS: '/home/me/skills',
@@ -150,7 +150,7 @@ try {
 
 ## CI usage
 
-SkillForge's own `scripts/smoke-test.mjs` is a fully working reference: it spawns `dist/server.js`, exercises all three core tools, and exits non-zero on regressions. Copy it as a starting template for your own integration smoke test:
+SkillForge's own `scripts/smoke-test.mjs` is a fully working reference: it spawns `dist/cli/dispatcher.js serve`, exercises all three core tools, and exits non-zero on regressions. Copy it as a starting template for your own integration smoke test:
 
 ```bash
 cp node_modules/@lyupro/skillforge-mcp/scripts/smoke-test.mjs ./tests/integration/skillforge-smoke.mjs

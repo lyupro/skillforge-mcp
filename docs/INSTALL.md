@@ -45,7 +45,7 @@ The manual wiring sections below remain the canonical reference for users who pr
 - **pnpm** — install via `npm install -g pnpm` if missing. Other package managers work for the build step but `pnpm` is the pinned tooling.
 - **Git** — for cloning until v1.0.0 is published to npm.
 
-> Once the npm package is published, the clone+build step is replaced by `npx -y @lyupro/skillforge-mcp` and the wiring commands change to use `npx` instead of an absolute `dist/server.js` path. Until then this guide assumes local-clone install.
+> Once the npm package is published, the clone+build step is replaced by `npx -y @lyupro/skillforge-mcp serve` and the wiring commands change to use `npx` instead of an absolute `dist/cli/dispatcher.js` path. Until then this guide assumes local-clone install.
 
 ---
 
@@ -55,20 +55,20 @@ The manual wiring sections below remain the canonical reference for users who pr
 git clone https://github.com/lyupro/skillforge-mcp.git
 cd skillforge-mcp
 pnpm install
-pnpm build              # emits dist/server.js
+pnpm build              # emits dist/ (entry point: dist/cli/dispatcher.js)
 pnpm smoke              # subprocess smoke test — exits 0 on success
 ```
 
 `pnpm smoke` spawns the built binary, connects via `StdioClientTransport`, exercises all five tools (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) against a tmp-folder fixture, and verifies the responses. If this passes, your build is healthy.
 
-Note the **absolute** path to `dist/server.js`. Every integration below needs it.
+Note the **absolute** path to `dist/cli/dispatcher.js`. Every integration below needs it.
 
 ```bash
 # Windows
-echo "$PWD\dist\server.js"
+echo "$PWD\dist\cli\dispatcher.js"
 
 # macOS / Linux
-realpath dist/server.js
+realpath dist/cli/dispatcher.js
 ```
 
 ---
@@ -93,7 +93,7 @@ claude plugin install skillforge@lyupro/skillforge-mcp
 ### As an MCP server
 
 ```bash
-claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js
+claude mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 Restart the Claude Code session. Five tools should appear in the tool list: `skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`.
@@ -117,7 +117,7 @@ Claude Code auto-loads built-in skills (~122 skills, ~4880 tokens). With SkillFo
 Codex CLI gained MCP support in 2026-05. Wiring is similar:
 
 ```bash
-codex mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/server.js
+codex mcp add skillforge -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 Config lives in `~/.codex/config.toml` under `[mcp_servers.skillforge]`. Project-scoped overrides go into `.codex/config.toml` at the repo root. To pass env vars (e.g. custom folders):
@@ -125,7 +125,7 @@ Config lives in `~/.codex/config.toml` under `[mcp_servers.skillforge]`. Project
 ```bash
 codex mcp add skillforge \
   --env SKILLFORGE_FOLDERS=/home/me/skills \
-  -- node /absolute/path/to/skillforge-mcp/dist/server.js
+  -- node /absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js serve
 ```
 
 See [INTEGRATION/codex.md](./INTEGRATION/codex.md) for verified config snippets and platform notes.
@@ -147,7 +147,7 @@ Cursor reads MCP servers from `~/.cursor/mcp.json` (global) or `<project>/.curso
   "mcpServers": {
     "skillforge": {
       "command": "node",
-      "args": ["/absolute/path/to/skillforge-mcp/dist/server.js"]
+      "args": ["/absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js", "serve"]
     }
   }
 }
@@ -169,7 +169,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const transport = new StdioClientTransport({
   command: 'node',
-  args: ['/absolute/path/to/skillforge-mcp/dist/server.js'],
+  args: ['/absolute/path/to/skillforge-mcp/dist/cli/dispatcher.js', 'serve'],
 });
 const client = new Client({ name: 'my-client', version: '1.0.0' });
 await client.connect(transport);
@@ -250,7 +250,7 @@ pnpm build
 pnpm smoke
 ```
 
-The wiring in Claude Code / Codex / Cursor points at the same `dist/server.js` absolute path — restarting the host session picks up the new build. Once published to npm, the upgrade flow becomes `npm install -g @lyupro/skillforge-mcp@latest` (or the equivalent for the host tool that fetched the package).
+The wiring in Claude Code / Codex / Cursor points at the same `dist/cli/dispatcher.js` absolute path — restarting the host session picks up the new build. Once published to npm, the upgrade flow becomes `npm install -g @lyupro/skillforge-mcp@latest` (or the equivalent for the host tool that fetched the package).
 
 ---
 

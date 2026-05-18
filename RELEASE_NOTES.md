@@ -7,6 +7,21 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.4.2 — One canonical entry point, offline-safe installs
+
+**Release date:** 2026-05-18
+
+The installer now writes a host config that does not depend on the npm registry, and the server has a single entry point.
+
+- **New default `--entry auto`.** The old default wrote an `npx` entry that re-resolves the package from the npm registry every time the server spawns — which fails on a machine with a registry cooldown policy or no network. `--entry auto` detects how the installer itself is running: from a stable install it writes a direct `node <dist/cli/dispatcher.js> serve` entry (no registry, offline-safe); from a one-shot `npx … install` it falls back to an npx entry. `--entry npx` and `--entry local` stay available as explicit overrides.
+- **One canonical entry point.** `dist/cli/dispatcher.js` is now the single entry point — `serve` (its default subcommand) starts the MCP stdio server. The server-start sequence, previously duplicated between the dispatcher and `server.ts`, now lives in one place; `server.ts` is a pure module. Installer-written host configs and the default `--binary-path` point at the dispatcher instead of the internal `server.js` module.
+
+**Engineering snapshot**
+
+- 627 tests passing + 2 skipped; the three host installers now share one entry-resolution module.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## v1.4.1 — Global-install CLI fix
 
 **Release date:** 2026-05-18
