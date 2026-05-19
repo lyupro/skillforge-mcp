@@ -134,7 +134,8 @@ The full Zod schema lives in `src/config/config-schema.ts`. Below is the camelCa
     "defaultTimeoutMs": 30000,
     "cacheTtlMs": 60000,
     "cacheMaxEntries": 128
-  }
+  },
+  "skillFormats": []
 }
 ```
 
@@ -194,6 +195,30 @@ The on-disk index is invalidated automatically: a fingerprint of every skill fil
 | `defaultTimeoutMs` | `30000` | `TimeoutDecorator` budget when a skill omits `timeoutMs` in its frontmatter. |
 | `cacheTtlMs` | `60000` | `CacheDecorator` TTL when a skill omits `cacheTtlMs` in its frontmatter (but is otherwise cacheable). |
 | `cacheMaxEntries` | `128` | LRU eviction trigger for the invocation result cache. |
+
+### `skillFormats[]`
+
+Declarative list of skill-format descriptors. SkillForge ships four built-in formats (`claude`, `codex`, `persona`, `custom`); operator entries in this array are merged over them by `id`. Adding support for a new LLM's skill layout is a config edit, not a code release. See [SKILL_FORMAT.md](./SKILL_FORMAT.md#skill-format-registry) for the full design.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `id` | `string` | — | Unique format identifier (kebab-case recommended). Reusing a built-in id replaces that built-in. |
+| `match` | object | — | Recognition rule, one of: `{"type":"filename","value":"SKILL.md"}`, `{"type":"filenameGlob","value":"*.skill.md"}`, `{"type":"frontmatterField","field":"persona"}`. |
+| `nameField` | `string` | `"name"` | Frontmatter key that holds the skill name. |
+| `deriveNameFromDir` | `boolean` | `false` | When the `nameField` is empty/absent, derive the skill name from the parent directory (kebab-normalized). Only meaningful for `filename` / `filenameGlob` matches. |
+| `enabled` | `boolean` | `true` | Disabled formats never match. |
+| `priority` | `int` | `100` | On a multi-format match, the highest-priority descriptor wins. |
+
+The four built-ins resolve to:
+
+| `id` | `match` | `deriveNameFromDir` | `priority` |
+|------|---------|---------------------|------------|
+| `claude` | `filename: SKILL.md` | `true` | `100` |
+| `codex` | `filename: AGENTS.md` | `true` | `100` |
+| `persona` | `frontmatterField: persona` | `false` | `90` |
+| `custom` | `filenameGlob: *.md` | `false` | `10` |
+
+Recognised but `name`-less files (`SKILL.md` / `AGENTS.md` without a `name:`) load under a name derived from the parent directory — `migration-architect/SKILL.md` registers as `migration-architect`. A generic `.md` (matched only by `custom`) without a `name:` is not a skill and is skipped, so `README.md` siblings never accidentally appear in the registry.
 
 ---
 

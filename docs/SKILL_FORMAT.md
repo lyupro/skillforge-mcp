@@ -58,7 +58,7 @@ The parser normalises aliases on read — internal `SkillContent` always exposes
 
 ## Dialect auto-detection
 
-`FormatDetector` assigns the `format` value when frontmatter omits it:
+`FormatDetector` assigns the `format` value when frontmatter omits it. Detection is driven by the [skill-format registry](#skill-format-registry); the table below summarises the four built-in formats:
 
 | Detected `format` | Trigger |
 |-------------------|---------|
@@ -68,6 +68,60 @@ The parser normalises aliases on read — internal `SkillContent` always exposes
 | `custom` | Everything else (any other `.md` filename) |
 
 Detection is a hint only — it surfaces in `skills__list` (`source: claude`/`codex`/`persona`/`custom` filter) and does not change runtime behaviour. Skills from any dialect go through the same Registry / Strategy / Decorator pipeline.
+
+Operator-defined formats (added via the [registry](#skill-format-registry)) report under the `custom` dialect in `skills__list` — the registry surfaces the precise `id` separately as `formatId`. A `name` derived from the parent directory also carries `nameSource: "directory"`; an explicit frontmatter `name` carries `nameSource: "frontmatter"`. Both fields appear in `skills__get` / `skills__list` JSON output.
+
+---
+
+## Skill format registry
+
+"What counts as a skill file" is **not hardcoded** — it is a config-driven list of format descriptors. The registry is the union of the four built-in defaults and any operator-supplied entries in `config.skillFormats`. Supporting a new LLM's layout (e.g. Gemini Gem files) is therefore a config edit, not a code release.
+
+Each descriptor carries:
+
+| Field | Purpose |
+|-------|---------|
+| `id` | Unique identifier (kebab-case). Reusing a built-in id replaces that built-in. |
+| `match` | Discriminated union: `{type:"filename"}`, `{type:"filenameGlob"}`, or `{type:"frontmatterField"}`. |
+| `nameField` | Frontmatter key holding the skill name (default `name`). |
+| `deriveNameFromDir` | Allow directory-name derivation when the `nameField` is empty/absent. Only meaningful for filename / filename-glob matches. |
+| `enabled` | Disabled descriptors never match. |
+| `priority` | Highest priority wins when a file matches more than one descriptor. |
+
+### Built-in defaults
+
+| `id` | `match` | `deriveNameFromDir` | `priority` |
+|------|---------|---------------------|------------|
+| `claude` | `filename: SKILL.md` | `true` | `100` |
+| `codex` | `filename: AGENTS.md` | `true` | `100` |
+| `persona` | `frontmatterField: persona` | `false` | `90` |
+| `custom` | `filenameGlob: *.md` | `false` | `10` |
+
+### Adding a format without code
+
+Use the `formats` CLI or edit `config.json` directly.
+
+```bash
+skillforge formats add gemini-gem --filename GEMINI.md --derive-name-from-dir
+skillforge formats add skill-suffix --filename-glob "*.skill.md" --priority 200
+skillforge formats list
+skillforge formats disable custom
+```
+
+The same operations can be performed by hand under `config.skillFormats` — see [CONFIGURATION.md](./CONFIGURATION.md#skillformats).
+
+### Name resolution and directory derivation
+
+When a file matches a format descriptor `F`, the skill name comes from frontmatter `F.nameField`. When that field is empty or absent:
+
+- if `F.deriveNameFromDir` is `true` **and** `F.match.type` is `filename` or `filenameGlob`, the name is derived from the parent directory, kebab-normalized (`migration-architect/SKILL.md` registers as `migration-architect`);
+- otherwise the parser throws and the file is skipped on stderr.
+
+A frontmatter-field match (e.g. `persona`) never derives — the parser cannot give such a file a stable identity from its path alone. Generic `.md` files matched only by `custom` likewise never derive, so a sibling `README.md` never becomes a skill.
+
+### Match conflicts and name collisions
+
+A file that matches several enabled formats resolves to the highest-priority descriptor; remaining descriptors are ignored. A skill `name` that registers from more than one folder resolves to the highest-priority folder via `SkillResolver`, and the collision is surfaced on stderr — the losing copies stay on disk but do not register.
 
 ---
 

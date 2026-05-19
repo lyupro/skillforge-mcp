@@ -1,6 +1,6 @@
 # Install CLI
 
-One-command wiring of SkillForge MCP into Claude Code, Codex CLI, Cursor, and Hermes Agent. Shipped in **v1.1**. For managing the skill registry from the terminal (list, get, reload), see the `skillforge skills` subcommand — available since **v1.4**.
+One-command wiring of SkillForge MCP into Claude Code, Codex CLI, Cursor, and Hermes Agent. Shipped in **v1.1**. For managing the skill registry from the terminal (list, get, reload), see the `skillforge skills` subcommand — available since **v1.4**. For managing the skill **format registry** from the terminal — adding support for new LLM layouts without a code release — see [`skillforge formats`](#skillforge-formats-subcommand).
 
 ## Overview
 
@@ -151,6 +151,46 @@ mv ~/.hermes/config.yaml.backup ~/.hermes/config.yaml
 ```
 
 The CLI never deletes `.backup` files on its own — clean them up when you no longer need them.
+
+## `skillforge formats` subcommand
+
+The skill format registry decides which files are skills and how their names are resolved. SkillForge ships four built-in formats (`claude`, `codex`, `persona`, `custom`); the `formats` subcommand lets you add, edit, or suppress formats from the shell. Persisted entries live under `config.skillFormats`. See [SKILL_FORMAT.md](./SKILL_FORMAT.md#skill-format-registry) for the full design.
+
+```bash
+skillforge formats list [--json]                          # all effective formats (built-in + operator)
+skillforge formats add <id> <match-flag> [flags]          # register a new format
+skillforge formats remove <id>                             # remove an operator format
+skillforge formats enable <id>                             # enable a format (built-in or operator)
+skillforge formats disable <id>                            # disable a format without removing it
+```
+
+`add` requires exactly one match flag:
+
+- `--filename <name>` — match an exact basename (e.g. `GEMINI.md`).
+- `--filename-glob <glob>` — match basenames against a glob (e.g. `*.skill.md`).
+- `--frontmatter-field <field>` — match files whose frontmatter has the named non-empty string field.
+
+`add` also accepts:
+
+- `--name-field <field>` — frontmatter key holding the skill name (default `name`).
+- `--derive-name-from-dir` — derive the name from the parent directory when the `name-field` is empty/absent. Only meaningful for filename / filename-glob matches.
+- `--priority <n>` — conflict-resolution priority (default `100`).
+- `--disabled` — register the format disabled.
+
+Examples:
+
+```bash
+# Recognize Gemini Gem files; derive names from the parent directory.
+skillforge formats add gemini-gem --filename GEMINI.md --derive-name-from-dir
+
+# Add a *.skill.md convention with the highest priority.
+skillforge formats add skill-suffix --filename-glob "*.skill.md" --priority 200
+
+# Suppress the catch-all *.md format without losing the entry.
+skillforge formats disable custom
+```
+
+Built-in formats cannot be removed (the registry would re-add them on the next load). Use `disable` to suppress one.
 
 ## Troubleshooting
 
