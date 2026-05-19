@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { readJsonSafe, writeJsonAtomic } from '../installers/atomic-write.js';
 
 /** Bumped when the on-disk index shape changes — older indexes load as null. */
-export const INDEX_VERSION = 1;
+export const INDEX_VERSION = 2;
 
 const indexEntrySchema = z.object({
   sourcePath: z.string(),
@@ -33,6 +33,11 @@ const indexEntrySchema = z.object({
   // the index — no extra disk read.
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  // Provenance — which skill-format descriptor matched and whether the name
+  // was read from frontmatter or derived from the directory. Optional so an
+  // index written before this field still loads.
+  formatId: z.string().optional(),
+  nameSource: z.enum(['frontmatter', 'directory']).optional(),
 });
 
 const registryIndexSchema = z.object({

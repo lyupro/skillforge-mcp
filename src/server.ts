@@ -21,7 +21,7 @@ import {
   SkillContentCache,
   SkillIndexStore,
 } from './core/index.js';
-import { FrontmatterParser, FileScanner } from './parser/index.js';
+import { FrontmatterParser, FileScanner, SkillFormatRegistry } from './parser/index.js';
 import { PromptStrategy } from './handlers/index.js';
 import { ScriptStrategy } from './handlers/script-strategy.js';
 import { HybridStrategy } from './handlers/hybrid-strategy.js';
@@ -226,6 +226,11 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
   );
   const indexEnabled = options.disableCache === true ? false : cacheCfg.indexEnabled;
 
+  // Skill-format registry: built-in formats merged with operator `skillFormats`.
+  // The parser consults it for candidate recognition, name resolution, and
+  // directory-name derivation.
+  const formatRegistry = SkillFormatRegistry.fromConfig(resolved.persisted);
+
   deps = {
     folders: resolved.folders,
     configStore,
@@ -235,7 +240,7 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
     contentCache: new SkillContentCache({ ttlMs: resolved.ttlMs }),
     indexStore,
     indexEnabled,
-    parser: new FrontmatterParser(),
+    parser: new FrontmatterParser({ formatRegistry, logger }),
     scanner: new FileScanner(),
     factory,
     blacklistFilter,

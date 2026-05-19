@@ -1,10 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import matter from 'gray-matter';
-import type { SkillContent, StrategyKind } from '../core/types.js';
+import type { SkillContent, StrategyKind, NameSource } from '../core/types.js';
 import { FormatDetector } from './format-detector.js';
+import { SkillFormatRegistry } from './skill-format-registry.js';
+import { deriveNameFromPath } from './name-derivation.js';
+import { defaultConfig } from '../config/config-schema.js';
 import { FsScriptsDirDetector } from './scripts-dir-detector.js';
 import type { ScriptsDirDetector } from './scripts-dir-detector.js';
+import { stderrLogger } from '../decorators/logging-decorator.js';
+import type { Logger } from '../decorators/logging-decorator.js';
 
 const CONSUMED_KEYS = new Set([
   'name', 'description', 'tags', 'format', 'strategy',
@@ -30,15 +35,26 @@ function normalizeTags(raw: unknown): string[] | undefined {
 interface ParserOptions {
   formatDetector?: FormatDetector;
   scriptsDirDetector?: ScriptsDirDetector;
+  /** Registry that drives format matching, name resolution, and derivation.
+   *  Defaults to the built-in registry; the server injects a config-backed one. */
+  formatRegistry?: SkillFormatRegistry;
+  /** Logger for the info message emitted when a skill name is derived from its
+   *  directory. Defaults to the stderr logger. */
+  logger?: Logger;
 }
 
 export class FrontmatterParser {
   readonly #detector: FormatDetector;
   readonly #scriptsDirDetector: ScriptsDirDetector;
+  readonly #registry: SkillFormatRegistry;
+  readonly #logger: Logger;
 
   constructor(options: ParserOptions = {}) {
-    this.#detector = options.formatDetector ?? new FormatDetector();
+    this.#registry =
+      options.formatRegistry ?? SkillFormatRegistry.fromConfig(defaultConfig());
+    this.#detector = options.formatDetector ?? new FormatDetector(this.#registry);
     this.#scriptsDirDetector = options.scriptsDirDetector ?? new FsScriptsDirDetector();
+    this.#logger = options.logger ?? stderrLogger;
   }
 
   async parseFile(absolutePath: string, configuredFolder: string): Promise<SkillContent> {
@@ -46,18 +62,44 @@ export class FrontmatterParser {
     const parsed = matter(raw);
     const data = parsed.data as Record<string, unknown>;
 
-    const name = typeof data['name'] === 'string' ? data['name'].trim() : '';
+    const fileName = basename(absolutePath);
+    const matchedFormat = this.#registry.matchFile(fileName, data);
+    const format = this.#detector.detect({ fileName, frontmatter: data });
+
+    // Name resolution: read the matched format's `nameField`. When that field
+    // is empty/absent, derive the name from the parent directory — but only
+    // when the matched format both allows it (`deriveNameFromDir`) and matched
+    // by a filename rule. A frontmatter-field match (e.g. `persona`) never
+    // derives, and an unmatched file always throws.
+    const nameField = matchedFormat?.nameField ?? 'name';
+    const rawName = data[nameField];
+    let name = typeof rawName === 'string' ? rawName.trim() : '';
+    let nameSource: NameSource = 'frontmatter';
+
     if (!name) {
-      throw new Error(`Skill at ${absolutePath}: missing required frontmatter field 'name'`);
+      const canDerive =
+        matchedFormat !== null &&
+        matchedFormat.deriveNameFromDir &&
+        (matchedFormat.match.type === 'filename' ||
+          matchedFormat.match.type === 'filenameGlob');
+      const derived = canDerive ? deriveNameFromPath(absolutePath) : null;
+      if (derived === null) {
+        throw new Error(
+          `Skill at ${absolutePath}: missing required frontmatter field '${nameField}'`,
+        );
+      }
+      name = derived;
+      nameSource = 'directory';
+      this.#logger.info(
+        `[skillforge] derived skill name "${name}" from directory for ${absolutePath} ` +
+          `(format "${matchedFormat!.id}", no '${nameField}' in frontmatter)`,
+      );
     }
 
     const description =
       typeof data['description'] === 'string' ? data['description'].trim() : undefined;
 
     const tags = normalizeTags(data['tags']);
-
-    const fileName = basename(absolutePath);
-    const format = this.#detector.detect({ fileName, frontmatter: data });
 
     const strategyRaw = data['strategy'];
     const strategy =
@@ -112,6 +154,8 @@ export class FrontmatterParser {
       folder: configuredFolder,
       tags,
       format,
+      formatId: matchedFormat?.id,
+      nameSource,
       strategy,
       allowScripts,
       allowNetwork,

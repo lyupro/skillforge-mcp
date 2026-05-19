@@ -58,6 +58,12 @@ export function formatSkillGet(skill: SkillContent): string {
   const lines: string[] = [];
   lines.push(`name:        ${skill.name}`);
   lines.push(`format:      ${skill.format}`);
+  if (skill.formatId !== undefined) {
+    lines.push(`formatId:    ${skill.formatId}`);
+  }
+  if (skill.nameSource !== undefined) {
+    lines.push(`nameSource:  ${skill.nameSource}`);
+  }
   lines.push(`folder:      ${skill.folder}`);
   lines.push(`sourcePath:  ${skill.sourcePath}`);
   if (skill.description !== undefined) {

@@ -11,6 +11,9 @@ export type SkillFormat = 'claude' | 'codex' | 'persona' | 'custom';
 
 export type StrategyKind = 'prompt' | 'script' | 'hybrid';
 
+/** Where a skill's `name` came from: its frontmatter, or a derived directory name. */
+export type NameSource = 'frontmatter' | 'directory';
+
 export interface SkillSummary {
   /** Unique identifier — primary key in SkillRegistry. */
   name: string;
@@ -24,6 +27,10 @@ export interface SkillSummary {
   tags?: string[];
   /** Detected frontmatter dialect — drives the Adapter selection in FrontmatterParser. */
   format: SkillFormat;
+  /** Id of the skill-format descriptor that matched this file (registry `skillFormats[].id`). */
+  formatId?: string;
+  /** Whether `name` was read from frontmatter or derived from the parent directory. */
+  nameSource?: NameSource;
 }
 
 export interface SkillMetadata extends SkillSummary {

@@ -3,6 +3,8 @@ import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FrontmatterParser } from './frontmatter-parser.js';
+import { SkillFormatRegistry } from './skill-format-registry.js';
+import { configSchema } from '../config/config-schema.js';
 import type { ScriptsDirDetector } from './scripts-dir-detector.js';
 
 let dir: string;
@@ -164,6 +166,117 @@ describe('FrontmatterParser', () => {
     await writeFile(filePath, '---\nname: T\n---\n', 'utf-8');
     const result = await parser.parseFile(filePath, dir);
     expect(result.format).toBe('claude');
+  });
+
+  it('sets formatId and nameSource on a frontmatter-named skill', async () => {
+    const filePath = await writeSkill('extra.md', '---\nname: T\n---\n');
+    const result = await parser.parseFile(filePath, dir);
+    expect(result.formatId).toBe('custom');
+    expect(result.nameSource).toBe('frontmatter');
+  });
+});
+
+describe('FrontmatterParser — name derivation', () => {
+  it('derives the name from the directory for a SKILL.md with no name', async () => {
+    const subDir = join(dir, 'migration-architect');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'SKILL.md');
+    await writeFile(filePath, '---\ndescription: x\n---\nbody', 'utf-8');
+    const result = await parser.parseFile(filePath, dir);
+    expect(result.name).toBe('migration-architect');
+    expect(result.nameSource).toBe('directory');
+    expect(result.formatId).toBe('claude');
+  });
+
+  it('derives the name from the directory for an AGENTS.md with no name', async () => {
+    const subDir = join(dir, 'My Cool Agent');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'AGENTS.md');
+    await writeFile(filePath, '---\n---\nbody', 'utf-8');
+    const result = await parser.parseFile(filePath, dir);
+    expect(result.name).toBe('my-cool-agent');
+    expect(result.nameSource).toBe('directory');
+  });
+
+  it('still throws for a generic README.md with no name (custom does not derive)', async () => {
+    const filePath = await writeSkill('README.md', '---\ndescription: just docs\n---\nbody');
+    await expect(parser.parseFile(filePath, dir)).rejects.toThrow(
+      "missing required frontmatter field 'name'",
+    );
+  });
+
+  it('prefers an explicit frontmatter name over derivation', async () => {
+    const subDir = join(dir, 'dir-name');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'SKILL.md');
+    await writeFile(filePath, '---\nname: explicit-name\n---\nbody', 'utf-8');
+    const result = await parser.parseFile(filePath, dir);
+    expect(result.name).toBe('explicit-name');
+    expect(result.nameSource).toBe('frontmatter');
+  });
+
+  it('does not derive when deriveNameFromDir is false for that format', async () => {
+    const config = configSchema.parse({
+      skillFormats: [
+        {
+          id: 'claude',
+          match: { type: 'filename', value: 'SKILL.md' },
+          deriveNameFromDir: false,
+        },
+      ],
+    });
+    const noDeriveParser = new FrontmatterParser({
+      formatRegistry: SkillFormatRegistry.fromConfig(config),
+    });
+    const subDir = join(dir, 'some-dir');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'SKILL.md');
+    await writeFile(filePath, '---\ndescription: x\n---\nbody', 'utf-8');
+    await expect(noDeriveParser.parseFile(filePath, dir)).rejects.toThrow(
+      "missing required frontmatter field 'name'",
+    );
+  });
+
+  it('emits an info log when a name is derived', async () => {
+    const messages: string[] = [];
+    const logger = {
+      info: (m: string) => messages.push(m),
+      warn: () => {},
+      error: () => {},
+    };
+    const loggingParser = new FrontmatterParser({ logger });
+    const subDir = join(dir, 'logged-skill');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'SKILL.md');
+    await writeFile(filePath, '---\n---\nbody', 'utf-8');
+    await loggingParser.parseFile(filePath, dir);
+    expect(messages.some((m) => m.includes('derived skill name "logged-skill"'))).toBe(
+      true,
+    );
+  });
+
+  it('recognizes an operator-defined format and derives its name', async () => {
+    const config = configSchema.parse({
+      skillFormats: [
+        {
+          id: 'gemini-gem',
+          match: { type: 'filename', value: 'GEMINI.md' },
+          deriveNameFromDir: true,
+          priority: 200,
+        },
+      ],
+    });
+    const opParser = new FrontmatterParser({
+      formatRegistry: SkillFormatRegistry.fromConfig(config),
+    });
+    const subDir = join(dir, 'gem-skill');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'GEMINI.md');
+    await writeFile(filePath, '---\ndescription: x\n---\nbody', 'utf-8');
+    const result = await opParser.parseFile(filePath, dir);
+    expect(result.name).toBe('gem-skill');
+    expect(result.formatId).toBe('gemini-gem');
+    expect(result.nameSource).toBe('directory');
   });
 });
 

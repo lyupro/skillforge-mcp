@@ -48,6 +48,8 @@ export async function handleList(
     folder: meta.folder,
     tags: meta.tags,
     format: meta.format,
+    formatId: meta.formatId,
+    nameSource: meta.nameSource,
   }));
 
   return { skills };

@@ -36,6 +36,8 @@ async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
       mtimeMs,
       description: meta.description,
       tags: meta.tags,
+      formatId: meta.formatId,
+      nameSource: meta.nameSource,
     };
   }
 
@@ -68,6 +70,8 @@ function hydrateFromIndex(deps: ServerDeps, index: RegistryIndex): void {
       format: entry.format,
       description: entry.description,
       tags: entry.tags,
+      formatId: entry.formatId,
+      nameSource: entry.nameSource,
     };
     deps.registry.register(meta);
   }

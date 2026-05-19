@@ -8,6 +8,7 @@ export { computeFingerprint } from './registry-fingerprint.js';
 export type {
   SkillFormat,
   StrategyKind,
+  NameSource,
   SkillSummary,
   SkillMetadata,
   SkillContent,
