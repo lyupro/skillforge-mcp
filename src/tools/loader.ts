@@ -52,7 +52,9 @@ async function persistIndex(deps: ServerDeps): Promise<void> {
     const snapshot = await buildIndexSnapshot(deps);
     await deps.indexStore.save(snapshot);
   } catch (err) {
-    console.error(`[skillforge] failed to write registry index: ${String(err)}`);
+    // Persisting the cached index is best-effort — operator should see warn-level
+    // failure so a perma-broken cache is visible without forcing debug.
+    deps.logger.warn(`[skillforge] failed to write registry index: ${String(err)}`);
   }
 }
 
@@ -101,7 +103,9 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
       if (errorSink !== undefined) {
         errorSink.push({ path: folder, message: msg });
       } else {
-        console.error(`[skillforge] skipped folder ${folder}: ${msg}`);
+        // A whole folder failing to scan is a real config problem — warn so it
+        // shows under the default `info` level.
+        deps.logger.warn(`[skillforge] skipped folder ${folder}: ${msg}`);
       }
       continue;
     }
@@ -115,7 +119,10 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
         if (errorSink !== undefined) {
           errorSink.push({ path: filePath, message: msg });
         } else {
-          console.error(`[skillforge] skipped ${filePath}: ${msg}`);
+          // Per-file skip is expected noise — sub-files inside skill directories
+          // (`README.md`, `references/*.md`) fail the `name` check. Log at debug
+          // so the default level stays clean.
+          deps.logger.debug(`[skillforge] skipped ${filePath}: ${msg}`);
         }
         continue;
       }
@@ -129,8 +136,9 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
         const detail = verdict.reason === 'manual'
           ? 'blacklisted by name'
           : `audit hit: ${verdict.pattern}`;
-        // Blacklist rejections are routine exclusions — always log to stderr, never sink.
-        console.error(`[skillforge] excluded "${meta.name}" from ${filePath} — ${detail}`);
+        // Blacklist rejection drops a skill from the registry — operator must
+        // see it. Always warn, never route through the sink.
+        deps.logger.warn(`[skillforge] excluded "${meta.name}" from ${filePath} — ${detail}`);
         continue;
       }
 
@@ -156,7 +164,7 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
         .filter((m) => m !== winner)
         .map((m) => m.sourcePath)
         .join(', ');
-      console.error(
+      deps.logger.warn(
         `[skillforge] name collision for "${name}" — kept ${winner.sourcePath}, ` +
           `ignored: ${losers}`,
       );

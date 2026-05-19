@@ -10,8 +10,20 @@ import { PromptStrategy } from '../handlers/prompt-strategy.js';
 import { BlacklistFilter } from '../security/blacklist-filter.js';
 import { SandboxRunner } from '../security/sandbox-runner.js';
 import { DecoratorChain, stderrLogger } from '../decorators/index.js';
+import type { Logger, LogLevel } from '../decorators/index.js';
 import type { ServerDeps } from '../server-deps.js';
 import type { SkillContent } from '../core/types.js';
+
+function captureLogger(): { logger: Logger; lines: { level: LogLevel; message: string }[] } {
+  const lines: { level: LogLevel; message: string }[] = [];
+  const logger: Logger = {
+    debug: (m) => { lines.push({ level: 'debug', message: m }); },
+    info: (m) => { lines.push({ level: 'info', message: m }); },
+    warn: (m) => { lines.push({ level: 'warn', message: m }); },
+    error: (m) => { lines.push({ level: 'error', message: m }); },
+  };
+  return { logger, lines };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,6 +51,7 @@ function makeDeps(overrides: Partial<{
   scanError: Map<string, Error>;
   parseError: Map<string, Error>;
   blacklistFilter: BlacklistFilter;
+  logger: Logger;
 }>): ServerDeps {
   const folders = overrides.folders ?? ['/skills'];
   const scanResults = overrides.scanResults ?? new Map();
@@ -70,7 +83,7 @@ function makeDeps(overrides: Partial<{
     blacklistFilter: overrides.blacklistFilter ?? new BlacklistFilter(),
     folderWatcher: {} as ServerDeps['folderWatcher'],
     configWatcher: {} as ServerDeps['configWatcher'],
-    logger: stderrLogger,
+    logger: overrides.logger ?? stderrLogger,
     sandboxRunner: new SandboxRunner({}),
     decoratorChain: new DecoratorChain({ logger: stderrLogger, defaultTimeoutMs: 5_000, cacheTtlMs: 60_000, cacheMaxEntries: 10 }),
   };
@@ -197,8 +210,8 @@ describe('handleReload — error collection', () => {
     expect(result.loaded).toBe(1);
   });
 
-  it('parse failure does NOT emit to stderr when errorSink is active', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('parse failure does NOT emit to the logger when errorSink is active', async () => {
+    const { logger, lines } = captureLogger();
     const folder = '/skills';
     const contentA = makeContent('skill-a', folder);
     const deps = makeDeps({
@@ -206,19 +219,19 @@ describe('handleReload — error collection', () => {
       scanResults: new Map([[folder, [`${folder}/skill-a.md`, `${folder}/bad.md`]]]),
       parseResults: new Map([[`${folder}/skill-a.md`, contentA]]),
       parseError: new Map([[`${folder}/bad.md`, new Error('bad frontmatter')]]),
+      logger,
     });
 
     const result = await handleReload(deps, {});
 
-    // The parse error goes to the sink, not to stderr.
-    const stderrCalls = errSpy.mock.calls.map((c) => String(c[0]));
-    expect(stderrCalls.some((m) => m.includes('bad frontmatter'))).toBe(false);
-    expect(stderrCalls.some((m) => m.includes('bad.md'))).toBe(false);
+    // The parse error goes to the sink, not to the logger.
+    expect(lines.some((l) => l.message.includes('bad frontmatter'))).toBe(false);
+    expect(lines.some((l) => l.message.includes('bad.md'))).toBe(false);
     expect(result.errors).toHaveLength(1);
   });
 
   it('blacklist-excluded skill does NOT appear in errors (routine exclusion)', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { logger, lines } = captureLogger();
     const folder = '/skills';
     const contentA = makeContent('skill-a', folder);
     const contentBad = makeContent('excluded-skill', folder);
@@ -230,21 +243,24 @@ describe('handleReload — error collection', () => {
         [`${folder}/excluded-skill.md`, contentBad],
       ]),
       blacklistFilter: new BlacklistFilter({ manualBlacklist: ['excluded-skill'] }),
+      logger,
     });
 
     const result = await handleReload(deps, {});
 
     expect(result.errors).toHaveLength(0);
     expect(result.loaded).toBe(1);
-    // Blacklist log goes to stderr as usual.
-    const stderrCalls = errSpy.mock.calls.map((c) => String(c[0]));
-    expect(stderrCalls.some((m) => m.includes('blacklisted by name'))).toBe(true);
+    // Blacklist log fires at warn level (security-significant).
+    const excludeLines = lines.filter((l) => l.message.includes('blacklisted by name'));
+    expect(excludeLines).toHaveLength(1);
+    expect(excludeLines[0]!.level).toBe('warn');
   });
 
   it('blacklist-excluded skill is in removed if it was previously registered', async () => {
     const folder = '/skills';
     const contentA = makeContent('skill-a', folder);
     const contentBL = makeContent('will-be-excluded', folder);
+    const { logger } = captureLogger();
 
     // First reload: no blacklist — both skills register.
     const deps = makeDeps({
@@ -254,8 +270,8 @@ describe('handleReload — error collection', () => {
         [`${folder}/skill-a.md`, contentA],
         [`${folder}/will-be-excluded.md`, contentBL],
       ]),
+      logger,
     });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await handleReload(deps, {});
     expect(deps.registry.has('will-be-excluded')).toBe(true);

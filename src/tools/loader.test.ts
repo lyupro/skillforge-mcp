@@ -10,10 +10,24 @@ import { BlacklistFilter } from '../security/blacklist-filter.js';
 import { PatternScanner } from '../security/pattern-scanner.js';
 import { SandboxRunner } from '../security/sandbox-runner.js';
 import { DecoratorChain, stderrLogger } from '../decorators/index.js';
+import type { Logger, LogLevel } from '../decorators/index.js';
 import { INDEX_VERSION, computeFingerprint } from '../core/index.js';
 import type { RegistryIndex } from '../core/index.js';
 import type { ServerDeps } from '../server-deps.js';
 import type { SkillContent } from '../core/types.js';
+
+/** Capture every logger call by level — lets assertions inspect what the
+ *  loader wrote and at which level. */
+function captureLogger(): { logger: Logger; lines: { level: LogLevel; message: string }[] } {
+  const lines: { level: LogLevel; message: string }[] = [];
+  const logger: Logger = {
+    debug: (m) => { lines.push({ level: 'debug', message: m }); },
+    info: (m) => { lines.push({ level: 'info', message: m }); },
+    warn: (m) => { lines.push({ level: 'warn', message: m }); },
+    error: (m) => { lines.push({ level: 'error', message: m }); },
+  };
+  return { logger, lines };
+}
 
 function makeContent(name: string, folder: string): SkillContent {
   return {
@@ -40,6 +54,7 @@ function makeDeps(overrides: Partial<{
   blacklistFilter: BlacklistFilter;
   indexStore: ServerDeps['indexStore'];
   indexEnabled: boolean;
+  logger: Logger;
 }>): ServerDeps {
   const folders = overrides.folders ?? ['/skills'];
   const scanResults = overrides.scanResults ?? new Map();
@@ -82,7 +97,7 @@ function makeDeps(overrides: Partial<{
     } as unknown as import('../parser/frontmatter-parser.js').FrontmatterParser,
     factory: new StrategyFactory([new PromptStrategy()]),
     blacklistFilter: overrides.blacklistFilter ?? new BlacklistFilter(),
-    logger: stderrLogger,
+    logger: overrides.logger ?? stderrLogger,
     sandboxRunner: new SandboxRunner({}),
     decoratorChain: new DecoratorChain({ logger: stderrLogger, defaultTimeoutMs: 5_000, cacheTtlMs: 60_000, cacheMaxEntries: 10 }),
   };
@@ -116,8 +131,8 @@ describe('ensureRegistryFresh', () => {
     expect(deps.metadataCache.markFresh).toHaveBeenCalledOnce();
   });
 
-  it('skips malformed skill file with stderr warning and continues', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('skips malformed skill file at debug level and continues', async () => {
+    const { logger, lines } = captureLogger();
     const folder = '/skills';
     const goodContent = makeContent('good-skill', folder);
     const deps = makeDeps({
@@ -125,18 +140,21 @@ describe('ensureRegistryFresh', () => {
       scanResults: new Map([[folder, [`${folder}/bad.md`, `${folder}/good-skill.md`]]]),
       parseResults: new Map([[`${folder}/good-skill.md`, goodContent]]),
       parseError: new Map([[`${folder}/bad.md`, new Error('bad frontmatter')]]),
+      logger,
     });
 
     await ensureRegistryFresh(deps);
 
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('/skills/bad.md'));
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('bad frontmatter'));
+    const skipLines = lines.filter((l) => l.message.includes('/skills/bad.md'));
+    expect(skipLines).toHaveLength(1);
+    expect(skipLines[0]!.level).toBe('debug');
+    expect(skipLines[0]!.message).toContain('bad frontmatter');
     expect(deps.registry.has('good-skill')).toBe(true);
     expect(deps.registry.has('bad')).toBe(false);
   });
 
-  it('skips missing folder with stderr warning and continues with remaining folders', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('skips missing folder at warn level and continues with remaining folders', async () => {
+    const { logger, lines } = captureLogger();
     const folder1 = '/missing';
     const folder2 = '/present';
     const content = makeContent('my-skill', folder2);
@@ -145,16 +163,19 @@ describe('ensureRegistryFresh', () => {
       scanResults: new Map([[folder2, [`${folder2}/my-skill.md`]]]),
       parseResults: new Map([[`${folder2}/my-skill.md`, content]]),
       scanError: new Map([[folder1, new Error('Folder not found: /missing')]]),
+      logger,
     });
 
     await ensureRegistryFresh(deps);
 
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('/missing'));
+    const folderLines = lines.filter((l) => l.message.includes('/missing'));
+    expect(folderLines).toHaveLength(1);
+    expect(folderLines[0]!.level).toBe('warn');
     expect(deps.registry.has('my-skill')).toBe(true);
   });
 
-  it('manual blacklist excludes a skill by name, keeps others', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('manual blacklist exclusion logs at warn level', async () => {
+    const { logger, lines } = captureLogger();
     const folder = '/skills';
     const contentX = makeContent('skill-x', folder);
     const contentY = makeContent('skill-y', folder);
@@ -166,17 +187,20 @@ describe('ensureRegistryFresh', () => {
         [`${folder}/skill-y.md`, contentY],
       ]),
       blacklistFilter: new BlacklistFilter({ manualBlacklist: ['skill-x'] }),
+      logger,
     });
 
     await ensureRegistryFresh(deps);
 
     expect(deps.registry.has('skill-x')).toBe(false);
     expect(deps.registry.has('skill-y')).toBe(true);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('blacklisted by name'));
+    const excludeLines = lines.filter((l) => l.message.includes('blacklisted by name'));
+    expect(excludeLines).toHaveLength(1);
+    expect(excludeLines[0]!.level).toBe('warn');
   });
 
-  it('auto-audit excludes skill with eval( in body, keeps clean skill', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('auto-audit exclusion logs at warn level (security-significant)', async () => {
+    const { logger, lines } = captureLogger();
     const folder = '/skills';
     const evilContent = makeContent('evil-skill', folder);
     evilContent.body = 'eval(user_input)';
@@ -192,17 +216,20 @@ describe('ensureRegistryFresh', () => {
         [`${folder}/clean-skill.md`, cleanContent],
       ]),
       blacklistFilter: new BlacklistFilter({ patternScanner: scanner }),
+      logger,
     });
 
     await ensureRegistryFresh(deps);
 
     expect(deps.registry.has('evil-skill')).toBe(false);
     expect(deps.registry.has('clean-skill')).toBe(true);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('audit hit: eval\\('));
+    const auditLines = lines.filter((l) => l.message.includes('audit hit: eval\\('));
+    expect(auditLines).toHaveLength(1);
+    expect(auditLines[0]!.level).toBe('warn');
   });
 
-  it('resolves conflict to higher-priority folder winner', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('resolves conflict to higher-priority folder winner with warn-level collision log', async () => {
+    const { logger, lines } = captureLogger();
     const folder1 = '/priority-1';
     const folder2 = '/priority-2';
     const content1 = makeContent('shared-skill', folder1);
@@ -217,6 +244,7 @@ describe('ensureRegistryFresh', () => {
         [`${folder1}/shared-skill.md`, content1],
         [`${folder2}/shared-skill.md`, content2],
       ]),
+      logger,
     });
 
     await ensureRegistryFresh(deps);
@@ -225,20 +253,22 @@ describe('ensureRegistryFresh', () => {
     expect(winner?.folder).toBe(folder1);
     const cachedContent = deps.contentCache.get('shared-skill');
     expect(cachedContent?.folder).toBe(folder1);
-    // The collision is warned on stderr; no crash, single registered winner.
-    expect(errSpy).toHaveBeenCalledWith(
-      expect.stringContaining('name collision for "shared-skill"'),
+    const collisionLines = lines.filter((l) =>
+      l.message.includes('name collision for "shared-skill"'),
     );
+    expect(collisionLines).toHaveLength(1);
+    expect(collisionLines[0]!.level).toBe('warn');
   });
 });
 
 describe('rebuildRegistry', () => {
-  it('errorSink supplied + scanner throws → error pushed to sink, NOT to stderr', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('errorSink supplied + scanner throws → error pushed to sink, NOT to the logger', async () => {
+    const { logger, lines } = captureLogger();
     const folder = '/missing';
     const deps = makeDeps({
       folders: [folder],
       scanError: new Map([[folder, new Error('folder not found')]]),
+      logger,
     });
 
     const sink: Array<{ path: string; message: string }> = [];
@@ -247,25 +277,25 @@ describe('rebuildRegistry', () => {
     expect(sink).toHaveLength(1);
     expect(sink[0]?.path).toBe(folder);
     expect(sink[0]?.message).toContain('folder not found');
-    // stderr must NOT contain the scan error when a sink is provided.
-    const stderrCalls = errSpy.mock.calls.map((c) => String(c[0]));
-    expect(stderrCalls.some((m) => m.includes('folder not found'))).toBe(false);
+    // Logger must NOT carry the scan error when a sink is provided.
+    expect(lines.some((l) => l.message.includes('folder not found'))).toBe(false);
     expect(stats.errors).toBe(sink);
   });
 
-  it('no errorSink + scanner throws → stderr message preserved (existing behavior)', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('no errorSink + scanner throws → warn line preserved (default routing)', async () => {
+    const { logger, lines } = captureLogger();
     const folder = '/missing';
     const deps = makeDeps({
       folders: [folder],
       scanError: new Map([[folder, new Error('folder not found')]]),
+      logger,
     });
 
     const stats = await rebuildRegistry(deps);
 
-    // Error goes to stderr, NOT to the returned errors array.
-    const stderrCalls = errSpy.mock.calls.map((c) => String(c[0]));
-    expect(stderrCalls.some((m) => m.includes('folder not found'))).toBe(true);
+    const folderLines = lines.filter((l) => l.message.includes('folder not found'));
+    expect(folderLines).toHaveLength(1);
+    expect(folderLines[0]!.level).toBe('warn');
     expect(stats.errors).toEqual([]);
   });
 
