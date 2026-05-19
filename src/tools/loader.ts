@@ -113,15 +113,20 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
     for (const filePath of filePaths) {
       let content;
       try {
-        content = await deps.parser.parseFile(filePath, folder);
+        // Two-phase: matchFile() runs first; a non-candidate (no enabled format
+        // descriptor matches) returns null and is silently dropped — no log
+        // line, because the file was never going to be a skill (`README.md`,
+        // `references/*.md`, `assets/*.md` siblings inside a skill directory).
+        content = await deps.parser.tryParseFile(filePath, folder);
+        if (content === null) continue;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (errorSink !== undefined) {
           errorSink.push({ path: filePath, message: msg });
         } else {
-          // Per-file skip is expected noise — sub-files inside skill directories
-          // (`README.md`, `references/*.md`) fail the `name` check. Log at debug
-          // so the default level stays clean.
+          // A real defect in a recognised skill file (broken frontmatter on a
+          // `SKILL.md` / `AGENTS.md`, missing `name` on a candidate). Debug so
+          // the default level stays clean.
           deps.logger.debug(`[skillforge] skipped ${filePath}: ${msg}`);
         }
         continue;

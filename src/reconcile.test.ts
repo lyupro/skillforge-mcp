@@ -66,6 +66,11 @@ function makeDeps(opts: {
         if (hit === undefined) throw new Error(`No parse result for ${filePath}`);
         return hit;
       }),
+      tryParseFile: vi.fn(async (filePath: string) => {
+        const hit = opts.parseResults.get(filePath);
+        if (hit === undefined) return null;
+        return hit;
+      }),
     } as unknown as ServerDeps['parser'],
     factory: new StrategyFactory([new PromptStrategy()]),
     blacklistFilter: new BlacklistFilter(),

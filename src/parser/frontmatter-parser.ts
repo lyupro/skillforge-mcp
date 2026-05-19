@@ -57,11 +57,39 @@ export class FrontmatterParser {
     this.#logger = options.logger ?? stderrLogger;
   }
 
+  /**
+   * Two-phase candidate check + parse. Returns `null` when the file does not
+   * match any enabled skill-format descriptor — the loader treats this as a
+   * silent ignore (no log line at any level, because the file was never going
+   * to be a skill: `README.md`, `references/*.md`, `assets/*.md` siblings).
+   * A file that matches a descriptor but has broken frontmatter still throws.
+   */
+  async tryParseFile(
+    absolutePath: string,
+    configuredFolder: string,
+  ): Promise<SkillContent | null> {
+    const raw = await readFile(absolutePath, 'utf-8');
+    const parsed = matter(raw);
+    const data = parsed.data as Record<string, unknown>;
+    const fileName = basename(absolutePath);
+    if (this.#registry.matchFile(fileName, data) === null) return null;
+    return this.#parseFromMatter(absolutePath, configuredFolder, raw, parsed, data);
+  }
+
   async parseFile(absolutePath: string, configuredFolder: string): Promise<SkillContent> {
     const raw = await readFile(absolutePath, 'utf-8');
     const parsed = matter(raw);
     const data = parsed.data as Record<string, unknown>;
+    return this.#parseFromMatter(absolutePath, configuredFolder, raw, parsed, data);
+  }
 
+  async #parseFromMatter(
+    absolutePath: string,
+    configuredFolder: string,
+    raw: string,
+    parsed: ReturnType<typeof matter>,
+    data: Record<string, unknown>,
+  ): Promise<SkillContent> {
     const fileName = basename(absolutePath);
     const matchedFormat = this.#registry.matchFile(fileName, data);
     const format = this.#detector.detect({ fileName, frontmatter: data });

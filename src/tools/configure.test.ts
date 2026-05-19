@@ -108,6 +108,10 @@ function makeDeps(overrides: {
         if (parseResults.has(filePath)) return parseResults.get(filePath)!;
         throw new Error(`No parse result for ${filePath}`);
       }),
+      tryParseFile: vi.fn(async (filePath: string, _folder: string) => {
+        if (parseResults.has(filePath)) return parseResults.get(filePath)!;
+        return null;
+      }),
     } as unknown as import('../parser/frontmatter-parser.js').FrontmatterParser,
     factory: new StrategyFactory([new PromptStrategy()]),
     blacklistFilter: new BlacklistFilter(),

@@ -281,6 +281,72 @@ describe('FrontmatterParser — name derivation', () => {
   });
 });
 
+describe('FrontmatterParser — tryParseFile candidate gate', () => {
+  it('returns null for a `.md` with no `name:` and no canonical filename — not a candidate', async () => {
+    // README.md / references/*.md are `custom`-format matches by glob, but
+    // `custom` does not derive names, and there is no `name:` in frontmatter
+    // → matchFile returns the `custom` descriptor, but parseFile would still
+    // throw. tryParseFile must NOT call the throwing path for a non-candidate.
+    //
+    // The custom built-in is enabled, so `*.md` does match — to verify the
+    // "silent ignore" path we disable `custom` for this test.
+    const config = configSchema.parse({
+      skillFormats: [{ id: 'custom', match: { type: 'filenameGlob', value: '*.md' }, enabled: false }],
+    });
+    const opParser = new FrontmatterParser({
+      formatRegistry: SkillFormatRegistry.fromConfig(config),
+    });
+    const filePath = await writeSkill('README.md', '---\ndescription: docs\n---\nbody');
+    const result = await opParser.tryParseFile(filePath, dir);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for a sub-file inside a skill directory when no descriptor matches', async () => {
+    const config = configSchema.parse({
+      skillFormats: [{ id: 'custom', match: { type: 'filenameGlob', value: '*.md' }, enabled: false }],
+    });
+    const opParser = new FrontmatterParser({
+      formatRegistry: SkillFormatRegistry.fromConfig(config),
+    });
+    const subDir = join(dir, 'my-skill');
+    await mkdir(subDir);
+    const ref = join(subDir, 'usability-testing-frameworks.md');
+    await writeFile(ref, '---\ndescription: ref doc\n---\nbody', 'utf-8');
+    expect(await opParser.tryParseFile(ref, dir)).toBeNull();
+  });
+
+  it('still throws on a SKILL.md with broken frontmatter (recognised candidate)', async () => {
+    const subDir = join(dir, 'busted-skill');
+    await mkdir(subDir);
+    const filePath = join(subDir, 'SKILL.md');
+    // Empty frontmatter and a directory name SkillForge can derive — should
+    // actually succeed via derivation. Force failure by disabling derivation.
+    const config = configSchema.parse({
+      skillFormats: [
+        {
+          id: 'claude',
+          match: { type: 'filename', value: 'SKILL.md' },
+          deriveNameFromDir: false,
+        },
+      ],
+    });
+    const opParser = new FrontmatterParser({
+      formatRegistry: SkillFormatRegistry.fromConfig(config),
+    });
+    await writeFile(filePath, '---\ndescription: x\n---\nbody', 'utf-8');
+    await expect(opParser.tryParseFile(filePath, dir)).rejects.toThrow(
+      "missing required frontmatter field 'name'",
+    );
+  });
+
+  it('returns SkillContent for a candidate with a valid `name:`', async () => {
+    const filePath = await writeSkill('any-name.md', '---\nname: example\n---\nbody');
+    const result = await parser.tryParseFile(filePath, dir);
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe('example');
+  });
+});
+
 describe('FrontmatterParser — scriptsDir injection', () => {
   it('populates scriptsDir when detector returns a path', async () => {
     const expectedDir = join(dir, 'scripts');
