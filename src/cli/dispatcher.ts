@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { main as installMain } from './install.js';
 import { main as toolsMain } from './tools.js';
 import { main as foldersMain } from './folders.js';
+import { main as formatsMain } from './formats.js';
 import { main as skillsMain } from './skills.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
@@ -54,6 +55,10 @@ Commands:
   folders      Manage skill folders from the terminal (list/add/remove/reset).
                Run "skillforge-mcp folders" for sub-action usage.
                  Example: skillforge-mcp folders add ~/.lyupro/skills
+  formats      Manage the skill format registry — list/add/remove/enable/disable.
+               Lets you support a new LLM's layout without a code change.
+               Run "skillforge-mcp formats" for sub-action usage.
+                 Example: skillforge-mcp formats add gemini-gem --filename GEMINI.md --derive-name-from-dir
   skills       View and reload skills from the terminal
                (list/get/reload/reindex). The CLI reads disk, not a live
                server session.
@@ -154,6 +159,9 @@ export async function main(
   }
   if (first === 'folders') {
     return foldersMain(rawArgv.slice(1));
+  }
+  if (first === 'formats') {
+    return formatsMain(rawArgv.slice(1));
   }
   if (first === 'skills') {
     return skillsMain(rawArgv.slice(1));

@@ -136,6 +136,20 @@ describe('dispatcher.main', () => {
     });
   });
 
+  describe('formats subcommand', () => {
+    it('routes to the formats handler and returns its exit code', async () => {
+      const code = await main(['formats']);
+      expect(code).toBe(2);
+      expect(errors.join('')).toContain('skillforge formats');
+    });
+
+    it('--help lists the formats command', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('formats');
+    });
+  });
+
   describe('skills subcommand', () => {
     it('routes to the skills handler and returns its exit code', async () => {
       const code = await main(['skills']);
