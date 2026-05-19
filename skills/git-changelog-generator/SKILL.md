@@ -1,5 +1,5 @@
 ---
-name: changelog-generator
+name: git-changelog-generator
 description: Generate a CHANGELOG.md entry from git log since the last tag, polished by the LLM.
 tags: [git, release, changelog]
 strategy: hybrid

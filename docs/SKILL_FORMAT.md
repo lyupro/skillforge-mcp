@@ -223,7 +223,7 @@ Supported extensions: `.py` (python3), `.sh` (bash), `.js` / `.mjs` (node).
 
 ```markdown
 ---
-name: changelog-generator
+name: git-changelog-generator
 description: Generate CHANGELOG.md entry from git log + LLM polish.
 tags: [git, release]
 allowScripts: true

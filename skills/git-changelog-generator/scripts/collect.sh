@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect commits since the last semver tag for changelog-generator hybrid skill.
+# Collect commits since the last semver tag for git-changelog-generator hybrid skill.
 # stdout: "<sha> <subject>" one per line. stderr: diagnostics on failure.
 set -euo pipefail
 
