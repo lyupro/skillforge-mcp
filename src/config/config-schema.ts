@@ -63,6 +63,84 @@ const invocationSchema = z
   })
   .passthrough();
 
+// Recognition rule for a skill format — a discriminated union so a malformed
+// entry fails fast with a precise message. `filename` matches an exact name,
+// `filenameGlob` a shell-style glob, `frontmatterField` the presence of a
+// non-empty frontmatter field.
+const formatMatchSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('filename'), value: z.string().min(1) }),
+  z.object({ type: z.literal('filenameGlob'), value: z.string().min(1) }),
+  z.object({ type: z.literal('frontmatterField'), field: z.string().min(1) }),
+]);
+
+// One declarative skill-format descriptor. The registry is the merge of these
+// seed defaults with operator-supplied entries — adding support for a new
+// LLM's layout is a config edit, not a code change.
+const skillFormatSchema = z
+  .object({
+    id: z.string().min(1),
+    match: formatMatchSchema,
+    nameField: z.string().min(1).default('name'),
+    deriveNameFromDir: z.boolean().default(false),
+    enabled: z.boolean().default(true),
+    priority: z.number().int().default(100),
+  })
+  .passthrough();
+
+// Built-in formats. The operator config is merged OVER these (by `id`), so an
+// operator can add, disable, or edit a built-in without code. `deriveNameFromDir`
+// is true for the canonical `SKILL.md` / `AGENTS.md` layouts so a file with no
+// `name:` is still addressable by its parent directory name.
+function defaultSkillFormats(): SkillFormat[] {
+  return [
+    {
+      id: 'claude',
+      match: { type: 'filename', value: 'SKILL.md' },
+      nameField: 'name',
+      deriveNameFromDir: true,
+      enabled: true,
+      priority: 100,
+    },
+    {
+      id: 'codex',
+      match: { type: 'filename', value: 'AGENTS.md' },
+      nameField: 'name',
+      deriveNameFromDir: true,
+      enabled: true,
+      priority: 100,
+    },
+    {
+      id: 'persona',
+      match: { type: 'frontmatterField', field: 'persona' },
+      nameField: 'name',
+      deriveNameFromDir: false,
+      enabled: true,
+      priority: 90,
+    },
+    {
+      id: 'custom',
+      match: { type: 'filenameGlob', value: '*.md' },
+      nameField: 'name',
+      deriveNameFromDir: false,
+      enabled: true,
+      priority: 10,
+    },
+  ];
+}
+
+/**
+ * Merge operator-supplied formats over the built-in defaults, keyed by `id`.
+ * An operator entry with a known id replaces that built-in; an unknown id is
+ * appended. Order: built-ins (in declared order) first, then new operator
+ * entries in the order given.
+ */
+function mergeSkillFormats(operator: SkillFormat[]): SkillFormat[] {
+  const merged = new Map<string, SkillFormat>();
+  for (const builtin of defaultSkillFormats()) merged.set(builtin.id, builtin);
+  for (const entry of operator) merged.set(entry.id, entry);
+  return [...merged.values()];
+}
+
 export const configSchema = z
   .object({
     version: z.literal('1.0').default('1.0'),
@@ -73,12 +151,30 @@ export const configSchema = z
     watcher: watcherSchema.default({}),
     logging: loggingSchema.default({}),
     invocation: invocationSchema.default({}),
+    // Operator-supplied format descriptors, merged over the built-in defaults
+    // by `id`. Defaults to an empty array — the resolved registry then equals
+    // the four built-ins. Use `resolveSkillFormats()` to get the merged list.
+    skillFormats: z.array(skillFormatSchema).default([]),
   })
   .passthrough();
 
 export type PersistedConfig = z.infer<typeof configSchema>;
 export type FolderEntry = z.infer<typeof folderEntrySchema>;
+export type SkillFormat = z.infer<typeof skillFormatSchema>;
+export type FormatMatch = z.infer<typeof formatMatchSchema>;
 
 export function defaultConfig(): PersistedConfig {
   return configSchema.parse({});
 }
+
+/**
+ * Resolve the effective skill-format registry for a config: the built-in
+ * defaults merged with any operator entries in `config.skillFormats`. This is
+ * the single source of truth `SkillFormatRegistry` loads from.
+ */
+export function resolveSkillFormats(config: PersistedConfig): SkillFormat[] {
+  return mergeSkillFormats(config.skillFormats);
+}
+
+/** The built-in seed formats, exported for tests and tooling. */
+export { defaultSkillFormats };

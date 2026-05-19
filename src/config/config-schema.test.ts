@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { configSchema, defaultConfig } from './config-schema.js';
+import {
+  configSchema,
+  defaultConfig,
+  defaultSkillFormats,
+  resolveSkillFormats,
+} from './config-schema.js';
 
 describe('configSchema', () => {
   it('parses empty object and fills all defaults', () => {
@@ -157,5 +162,118 @@ describe('configSchema', () => {
       security: { autoAudit: false, futureSecurityField: true },
     });
     expect((result.security as Record<string, unknown>)['futureSecurityField']).toBe(true);
+  });
+});
+
+describe('skillFormats schema', () => {
+  it('defaults skillFormats to an empty array', () => {
+    expect(configSchema.parse({}).skillFormats).toEqual([]);
+  });
+
+  it('ships 4 built-in seed formats', () => {
+    const ids = defaultSkillFormats().map((f) => f.id);
+    expect(ids).toEqual(['claude', 'codex', 'persona', 'custom']);
+  });
+
+  it('locks deriveNameFromDir true for the canonical claude/codex formats', () => {
+    const byId = new Map(defaultSkillFormats().map((f) => [f.id, f]));
+    expect(byId.get('claude')!.deriveNameFromDir).toBe(true);
+    expect(byId.get('codex')!.deriveNameFromDir).toBe(true);
+    expect(byId.get('persona')!.deriveNameFromDir).toBe(false);
+    expect(byId.get('custom')!.deriveNameFromDir).toBe(false);
+  });
+
+  it('resolveSkillFormats returns the 4 built-ins for an empty config', () => {
+    const formats = resolveSkillFormats(defaultConfig());
+    expect(formats.map((f) => f.id)).toEqual(['claude', 'codex', 'persona', 'custom']);
+  });
+
+  it('parses a filename match descriptor', () => {
+    const result = configSchema.parse({
+      skillFormats: [{ id: 'x', match: { type: 'filename', value: 'X.md' } }],
+    });
+    const entry = result.skillFormats[0]!;
+    expect(entry.match).toEqual({ type: 'filename', value: 'X.md' });
+    expect(entry.nameField).toBe('name');
+    expect(entry.deriveNameFromDir).toBe(false);
+    expect(entry.enabled).toBe(true);
+    expect(entry.priority).toBe(100);
+  });
+
+  it('parses a filenameGlob match descriptor', () => {
+    const result = configSchema.parse({
+      skillFormats: [{ id: 'g', match: { type: 'filenameGlob', value: '*.skill.md' } }],
+    });
+    expect(result.skillFormats[0]!.match).toEqual({
+      type: 'filenameGlob',
+      value: '*.skill.md',
+    });
+  });
+
+  it('parses a frontmatterField match descriptor', () => {
+    const result = configSchema.parse({
+      skillFormats: [{ id: 'p', match: { type: 'frontmatterField', field: 'persona' } }],
+    });
+    expect(result.skillFormats[0]!.match).toEqual({
+      type: 'frontmatterField',
+      field: 'persona',
+    });
+  });
+
+  it('rejects an unknown match type', () => {
+    expect(() =>
+      configSchema.parse({
+        skillFormats: [{ id: 'x', match: { type: 'bogus', value: 'X.md' } }],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects a format entry with an empty id', () => {
+    expect(() =>
+      configSchema.parse({
+        skillFormats: [{ id: '', match: { type: 'filename', value: 'X.md' } }],
+      }),
+    ).toThrow();
+  });
+
+  it('merges an operator format over the built-ins by id', () => {
+    const config = configSchema.parse({
+      skillFormats: [
+        { id: 'gemini-gem', match: { type: 'filename', value: 'GEMINI.md' } },
+      ],
+    });
+    const formats = resolveSkillFormats(config);
+    expect(formats.map((f) => f.id)).toEqual([
+      'claude',
+      'codex',
+      'persona',
+      'custom',
+      'gemini-gem',
+    ]);
+  });
+
+  it('lets an operator entry replace a built-in by reusing its id', () => {
+    const config = configSchema.parse({
+      skillFormats: [
+        { id: 'custom', match: { type: 'filenameGlob', value: '*.md' }, enabled: false },
+      ],
+    });
+    const custom = resolveSkillFormats(config).find((f) => f.id === 'custom')!;
+    expect(custom.enabled).toBe(false);
+  });
+
+  it('round-trips skillFormats through JSON', () => {
+    const config = configSchema.parse({
+      skillFormats: [
+        {
+          id: 'gemini-gem',
+          match: { type: 'filename', value: 'GEMINI.md' },
+          deriveNameFromDir: true,
+          priority: 50,
+        },
+      ],
+    });
+    const reloaded = configSchema.parse(JSON.parse(JSON.stringify(config)));
+    expect(reloaded.skillFormats).toEqual(config.skillFormats);
   });
 });
