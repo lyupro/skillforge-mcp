@@ -9,7 +9,7 @@ import { PromptStrategy } from '../handlers/prompt-strategy.js';
 import { BlacklistFilter } from '../security/blacklist-filter.js';
 import { PatternScanner } from '../security/pattern-scanner.js';
 import { SandboxRunner } from '../security/sandbox-runner.js';
-import { DecoratorChain, stderrLogger } from '../decorators/index.js';
+import { DecoratorChain, stderrLogger, createLeveledLogger } from '../decorators/index.js';
 import type { Logger, LogLevel } from '../decorators/index.js';
 import { INDEX_VERSION, computeFingerprint } from '../core/index.js';
 import type { RegistryIndex } from '../core/index.js';
@@ -315,6 +315,71 @@ describe('rebuildRegistry', () => {
     const stats = await rebuildRegistry(deps);
 
     expect(stats.skills).toEqual(['alpha-skill', 'zebra-skill']);
+  });
+});
+
+describe('ensureRegistryFresh — leveled logger integration', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('default (info) suppresses per-file skip lines but keeps folder failure visible', async () => {
+    const sink = captureLogger();
+    const leveled = createLeveledLogger({ level: 'info', sink: sink.logger });
+    const folderMissing = '/missing';
+    const folderPresent = '/skills';
+    const goodContent = makeContent('good-skill', folderPresent);
+    const deps = makeDeps({
+      folders: [folderMissing, folderPresent],
+      scanResults: new Map([[folderPresent, [`${folderPresent}/bad.md`, `${folderPresent}/good.md`]]]),
+      parseResults: new Map([[`${folderPresent}/good.md`, goodContent]]),
+      parseError: new Map([[`${folderPresent}/bad.md`, new Error('missing required frontmatter field')]]),
+      scanError: new Map([[folderMissing, new Error('Folder not found')]]),
+      logger: leveled,
+    });
+
+    await ensureRegistryFresh(deps);
+
+    // Folder failure surfaces at warn — passes through.
+    expect(sink.lines.some((l) => l.level === 'warn' && l.message.includes('skipped folder /missing'))).toBe(true);
+    // Per-file skip is debug — dropped at info level.
+    expect(sink.lines.some((l) => l.message.includes('skipped /skills/bad.md'))).toBe(false);
+  });
+
+  it('debug level emits per-file skip lines', async () => {
+    const sink = captureLogger();
+    const leveled = createLeveledLogger({ level: 'debug', sink: sink.logger });
+    const folder = '/skills';
+    const goodContent = makeContent('good-skill', folder);
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/bad.md`, `${folder}/good.md`]]]),
+      parseResults: new Map([[`${folder}/good.md`, goodContent]]),
+      parseError: new Map([[`${folder}/bad.md`, new Error('missing required frontmatter field')]]),
+      logger: leveled,
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(sink.lines.some((l) => l.level === 'debug' && l.message.includes('skipped /skills/bad.md'))).toBe(true);
+  });
+
+  it('warn level still surfaces blacklist exclusion (security-significant)', async () => {
+    const sink = captureLogger();
+    const leveled = createLeveledLogger({ level: 'warn', sink: sink.logger });
+    const folder = '/skills';
+    const content = makeContent('bad-skill', folder);
+    const deps = makeDeps({
+      folders: [folder],
+      scanResults: new Map([[folder, [`${folder}/bad-skill.md`]]]),
+      parseResults: new Map([[`${folder}/bad-skill.md`, content]]),
+      blacklistFilter: new BlacklistFilter({ manualBlacklist: ['bad-skill'] }),
+      logger: leveled,
+    });
+
+    await ensureRegistryFresh(deps);
+
+    expect(sink.lines.some((l) => l.level === 'warn' && l.message.includes('blacklisted by name'))).toBe(true);
   });
 });
 
