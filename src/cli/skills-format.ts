@@ -81,17 +81,34 @@ export function formatSkillGet(skill: SkillContent): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** Render the reload summary in human-readable form. */
+/** Render the reload summary in human-readable form.
+ *
+ * `folderPaths` is the configured folder list — used to split the error sink
+ * into folder-scan failures (path equals a configured folder) vs per-file
+ * parse skips (path is a file inside one). Operator sees the breakdown at a
+ * glance instead of an opaque total. */
 export function formatReloadStats(
   stats: RebuildStats,
   folderCount: number,
+  folderPaths: readonly string[] = [],
 ): string {
+  const folderSet = new Set(folderPaths);
+  let folderFailures = 0;
+  let fileSkips = 0;
+  for (const e of stats.errors) {
+    if (folderSet.has(e.path)) {
+      folderFailures += 1;
+    } else {
+      fileSkips += 1;
+    }
+  }
+
   const lines: string[] = [];
   lines.push(`Reload complete.`);
   lines.push(`  folders: ${folderCount}`);
   lines.push(`  skills:  ${stats.skills.length}`);
   if (stats.errors.length > 0) {
-    lines.push(`  errors:  ${stats.errors.length}`);
+    lines.push(`  errors:  ${stats.errors.length} (folder-failures: ${folderFailures}, file-skips: ${fileSkips})`);
     for (const e of stats.errors) {
       lines.push(`    ${e.path}: ${e.message}`);
     }

@@ -196,7 +196,7 @@ export async function handleSkillsReload(
     await reconcileFolders(deps);
     const errors: Array<{ path: string; message: string }> = [];
     const stats = await rebuildRegistry(deps, { errorSink: errors });
-    stdout(formatReloadStats(stats, deps.folders.length));
+    stdout(formatReloadStats(stats, deps.folders.length, deps.folders));
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
