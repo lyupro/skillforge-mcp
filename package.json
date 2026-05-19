@@ -49,6 +49,7 @@
     "lint": "tsc --noEmit",
     "check:size": "node scripts/check-file-size.mjs",
     "smoke": "node scripts/smoke-test.mjs",
+    "bench:index": "node scripts/bench-index.mjs",
     "prepare": "simple-git-hooks",
     "prepublishOnly": "pnpm build"
   },

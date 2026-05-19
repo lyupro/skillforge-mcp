@@ -30,7 +30,9 @@ src/
 │   ├── skill-registry.ts        ← Map-backed name → SkillMetadata
 │   ├── skill-resolver.ts        ← priority-based conflict resolution across folders
 │   ├── skill-metadata-cache.ts  ← single-value freshness flag (TTL gate for the registry)
-│   └── skill-content-cache.ts   ← per-skill body LRU + TTL
+│   ├── skill-content-cache.ts   ← per-skill body LRU + TTL
+│   ├── skill-index-store.ts     ← persistent on-disk registry index (load/save/invalidate)
+│   └── registry-fingerprint.ts  ← stable hash of skill-file paths + mtimes (index validity gate)
 │
 ├── parser/                      ← Skill-file → SkillContent
 │   ├── file-scanner.ts          ← recursive readdir, prunes node_modules/.git/dist
@@ -156,7 +158,15 @@ The factory + chain are constructed once at boot in `buildDeps()`. Each invocati
 | `SkillContentCache` | `name → SkillContent` LRU | TTL per entry. Cleared at the start of every `rebuildRegistry`. |
 | `CacheDecorator.#store` | `sha256(name + '\x00' + input) → {result, expiresAt}` | TTL per entry. Per-skill `cacheTtlMs` override falls back to global `invocation.cacheTtlMs`. LRU eviction at `cacheMaxEntries`. |
 
-All three are in-memory only. SkillForge persists nothing about runtime state to disk — only the user-facing JSON config (folder list, blacklist, security gates).
+The three caches above are in-memory only — they do not survive a process exit.
+
+### Persistent registry index
+
+The CLI runs every `skills get` as a fresh process, so the in-memory caches start empty and each call would otherwise do a full cold scan (recursive `readdir` + `gray-matter` parse of every skill file). `SkillIndexStore` (`src/core/skill-index-store.ts`) persists a registry snapshot to `<configDir>/cache/registry-index.json` so a subsequent process hydrates the registry from one file read and parses only the skill it was asked for.
+
+Validity is gated by a **fingerprint** (`src/core/registry-fingerprint.ts`): a stable hash of every skill file's path plus its `mtimeMs`. Recomputing it costs only filesystem metadata reads — no frontmatter parse. A match means the index is still valid; any add, remove, or in-place edit changes the hash and forces a rebuild. A corrupt, missing, or version-mismatched index degrades silently to a full rebuild. The `FolderWatcher` and config reconcile path also drop the index on change.
+
+Benchmark (`scripts/bench-index.mjs`, 500 synthetic skills, median of 20 runs): a warm `skills get` that hydrates from the index takes ~28 ms versus ~109 ms for a cold `--no-cache` scan — roughly a **3.8x** speedup. The gap widens further across separate CLI processes, where the cold path also re-parses every file.
 
 ---
 

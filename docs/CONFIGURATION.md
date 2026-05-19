@@ -118,7 +118,9 @@ The full Zod schema lives in `src/config/config-schema.ts`. Below is the camelCa
   "cache": {
     "metadataTtlMs": 300000,
     "contentTtlMs": 300000,
-    "maxSizeMb": 50
+    "maxSizeMb": 50,
+    "indexEnabled": true,
+    "indexPath": null
   },
   "watcher": {
     "enabled": true,
@@ -166,6 +168,10 @@ Array of exact skill names (case-sensitive) to exclude from the registry. Short-
 | `metadataTtlMs` | `300000` (5 min) | `SkillMetadataCache` freshness window. After expiry, the next `skills__list` rescans. Currently the runtime reads the env-side `SKILLFORGE_TTL_MS` for both metadata + content caches; this persisted field is reserved for the planned config-overrides-env wiring. |
 | `contentTtlMs` | `300000` | Same status as `metadataTtlMs` — currently env-driven. |
 | `maxSizeMb` | `50` | Reserved — content cache currently uses LRU eviction by entry count, not bytes. |
+| `indexEnabled` | `true` | Enables the persistent on-disk registry index. A fresh CLI process hydrates the registry from the index file with one read instead of a full cold scan. Set `false` (or pass `--no-cache`) to always do a full scan. |
+| `indexPath` | `null` | Absolute path to the index file. When `null`/absent it is derived as `<configDir>/cache/registry-index.json`. |
+
+The on-disk index is invalidated automatically: a fingerprint of every skill file's path + modification time is recomputed on each call, and any add / remove / in-place edit forces a rebuild. A corrupt or version-mismatched index degrades silently to a full rebuild. Run `skillforge skills reindex` to force a rebuild on demand.
 
 ### `watcher`
 
