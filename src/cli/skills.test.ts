@@ -437,6 +437,61 @@ describe('skills.main — --no-cache flag', () => {
   });
 });
 
+describe('skills.main — --verbose / --quiet flags', () => {
+  it('--verbose forwards logLevel=debug to buildDeps and strips the flag', async () => {
+    let capturedLevel: string | undefined;
+    const code = await main(['list', '--verbose'], {
+      stdout: () => undefined,
+      stderr: () => undefined,
+      buildDeps: async (opts) => {
+        capturedLevel = opts?.logLevel;
+        return makeFakeDeps()();
+      },
+    });
+    expect(code).toBe(0);
+    expect(capturedLevel).toBe('debug');
+  });
+
+  it('-v short alias also maps to debug', async () => {
+    let capturedLevel: string | undefined;
+    await main(['-v', 'list'], {
+      stdout: () => undefined,
+      stderr: () => undefined,
+      buildDeps: async (opts) => {
+        capturedLevel = opts?.logLevel;
+        return makeFakeDeps()();
+      },
+    });
+    expect(capturedLevel).toBe('debug');
+  });
+
+  it('--quiet forwards logLevel=warn', async () => {
+    let capturedLevel: string | undefined;
+    await main(['list', '--quiet'], {
+      stdout: () => undefined,
+      stderr: () => undefined,
+      buildDeps: async (opts) => {
+        capturedLevel = opts?.logLevel;
+        return makeFakeDeps()();
+      },
+    });
+    expect(capturedLevel).toBe('warn');
+  });
+
+  it('omitting the flag leaves logLevel undefined', async () => {
+    let capturedLevel: string | undefined = 'sentinel';
+    await main(['list'], {
+      stdout: () => undefined,
+      stderr: () => undefined,
+      buildDeps: async (opts) => {
+        capturedLevel = opts?.logLevel;
+        return makeFakeDeps()();
+      },
+    });
+    expect(capturedLevel).toBeUndefined();
+  });
+});
+
 describe('skills.main — buildDeps failure', () => {
   it('returns exit 1 when deps factory throws', async () => {
     let err = '';

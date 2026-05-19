@@ -36,19 +36,22 @@
  */
 
 import type { ServerDeps } from '../server-deps.js';
+import type { LogLevel } from '../decorators/index.js';
 import {
   handleSkillsList,
   handleSkillsGet,
   handleSkillsReload,
   handleSkillsReindex,
 } from './skills-handlers.js';
+import { extractLogFlags } from './log-flags.js';
 
 export interface SkillsDeps {
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
   /** Override the ServerDeps factory — tests inject a fake deps object here.
-   *  `disableCache` is set when the caller passed `--no-cache`. */
-  buildDeps?: (opts?: { disableCache?: boolean }) => Promise<ServerDeps>;
+   *  `disableCache` is set when the caller passed `--no-cache`. `logLevel` is
+   *  set by `--verbose` / `--quiet`. */
+  buildDeps?: (opts?: { disableCache?: boolean; logLevel?: LogLevel }) => Promise<ServerDeps>;
 }
 
 const USAGE = `skillforge skills — view and reload skills from the terminal.
@@ -78,6 +81,10 @@ Actions:
 Global flags:
   --no-cache          Bypass the persistent on-disk index — forces a full
                         cold scan (debug / CI).
+  --verbose, -v       Lower the log threshold to debug — emit per-file
+                        skip lines and other low-level diagnostics on stderr.
+  --quiet, -q         Raise the log threshold to warn — suppress info-level
+                        diagnostics.
 
 Examples:
   skillforge skills list
@@ -102,10 +109,12 @@ export async function main(rawArgv: string[], deps: SkillsDeps = {}): Promise<nu
   const stdout = deps.stdout ?? ((text: string) => process.stdout.write(text));
   const stderr = deps.stderr ?? ((text: string) => process.stderr.write(text));
 
-  const action = rawArgv[0];
-  // `--no-cache` is a global flag — strip it from the action args before the
-  // per-action flag parsers see it, and use it to disable the on-disk index.
-  const rawRest = rawArgv.slice(1);
+  // Strip global flags before the per-action parsers see them. `--verbose` /
+  // `--quiet` flow into buildDeps as a logger override; `--no-cache` flips
+  // the on-disk index off.
+  const { rest: afterLog, logLevel } = extractLogFlags(rawArgv);
+  const action = afterLog[0];
+  const rawRest = afterLog.slice(1);
   const disableCache = rawRest.includes('--no-cache');
   const rest = rawRest.filter((a) => a !== '--no-cache');
 
@@ -120,11 +129,11 @@ export async function main(rawArgv: string[], deps: SkillsDeps = {}): Promise<nu
 
   let serverDeps: ServerDeps;
   try {
-    const factory = deps.buildDeps ?? (async (opts?: { disableCache?: boolean }) => {
+    const factory = deps.buildDeps ?? (async (opts?: { disableCache?: boolean; logLevel?: LogLevel }) => {
       const { buildDeps } = await import('../server.js');
       return buildDeps(opts);
     });
-    serverDeps = await factory({ disableCache });
+    serverDeps = await factory({ disableCache, logLevel: logLevel ?? undefined });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     stderr(`skillforge skills: failed to initialise registry: ${msg}\n`);

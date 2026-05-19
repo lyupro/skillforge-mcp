@@ -35,6 +35,7 @@ import {
   handleRemove,
   handleReset,
 } from './folders-handlers.js';
+import { extractLogFlags } from './log-flags.js';
 
 export interface FoldersDeps {
   stdout?: (text: string) => void;
@@ -85,8 +86,11 @@ export async function main(rawArgv: string[], deps: FoldersDeps = {}): Promise<n
   const isDirectory = deps.isDirectory ?? defaultIsDirectory;
   const store = new ConfigStore({ filePath: deps.configPath ?? defaultConfigPath() });
 
-  const action = rawArgv[0];
-  const rest = rawArgv.slice(1);
+  // `folders` does not build server deps — but `--verbose` / `--quiet` are
+  // accepted globally and silently stripped so users can pass them uniformly.
+  const { rest: afterLog } = extractLogFlags(rawArgv);
+  const action = afterLog[0];
+  const rest = afterLog.slice(1);
 
   try {
     switch (action) {

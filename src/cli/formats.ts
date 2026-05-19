@@ -41,6 +41,7 @@ import {
   handleList,
   handleRemove,
 } from './formats-handlers.js';
+import { extractLogFlags } from './log-flags.js';
 
 export interface FormatsDeps {
   stdout?: (text: string) => void;
@@ -92,8 +93,11 @@ export async function main(rawArgv: string[], deps: FormatsDeps = {}): Promise<n
   const stderr = deps.stderr ?? ((text: string) => process.stderr.write(text));
   const store = new ConfigStore({ filePath: deps.configPath ?? defaultConfigPath() });
 
-  const action = rawArgv[0];
-  const rest = rawArgv.slice(1);
+  // `formats` does not build server deps — but `--verbose` / `--quiet` are
+  // accepted globally and silently stripped so users can pass them uniformly.
+  const { rest: afterLog } = extractLogFlags(rawArgv);
+  const action = afterLog[0];
+  const rest = afterLog.slice(1);
 
   try {
     switch (action) {

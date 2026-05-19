@@ -28,7 +28,13 @@ import { HybridStrategy } from './handlers/hybrid-strategy.js';
 import { StrategyFactory } from './factory/index.js';
 import { BlacklistFilter } from './security/index.js';
 import { SandboxRunner } from './security/sandbox-runner.js';
-import { DecoratorChain, stderrLogger } from './decorators/index.js';
+import {
+  DecoratorChain,
+  stderrLogger,
+  createLeveledLogger,
+  envDebugOverride,
+} from './decorators/index.js';
+import type { LogLevel } from './decorators/index.js';
 import type { ServerDeps } from './server-deps.js';
 import {
   listInputSchema,
@@ -148,6 +154,11 @@ export interface BuildDepsOptions {
   /** When true the persistent on-disk registry index is disabled regardless
    *  of config — forces a full cold scan. Set by the CLI `--no-cache` flag. */
   disableCache?: boolean;
+  /** Explicit logger threshold override. Beats every other source — used by
+   *  the CLI `--verbose` / `--quiet` flags. When omitted the level falls back
+   *  to the env override (SKILLFORGE_DEBUG / DEBUG), then to `logging.level`
+   *  from the persisted config. */
+  logLevel?: LogLevel;
 }
 
 export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerDeps> {
@@ -189,7 +200,11 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
     },
   });
 
-  const logger = stderrLogger;
+  // Logger level precedence: explicit option (CLI flag) → env override
+  // (SKILLFORGE_DEBUG / DEBUG) → persisted `logging.level` → schema default.
+  const effectiveLevel: LogLevel =
+    options.logLevel ?? envDebugOverride() ?? resolved.persisted.logging.level;
+  const logger = createLeveledLogger({ level: effectiveLevel, sink: stderrLogger });
   const sandboxRunner = new SandboxRunner({ logger });
   // allowScripts flag captured from initial config load. A ref object is used
   // so tools/configure can update it by calling configStore.load() indirectly.
