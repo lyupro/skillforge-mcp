@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { LoggingDecorator, stderrLogger } from './logging-decorator.js';
+import {
+  LoggingDecorator,
+  stderrLogger,
+  createLeveledLogger,
+  envDebugOverride,
+} from './logging-decorator.js';
 import type { Logger } from './logging-decorator.js';
 import type { InvocationStrategy } from '../handlers/invocation-strategy.js';
 import type { InvocationContext, InvocationResult, StrategyKind, SkillContent } from '../core/types.js';
@@ -42,6 +47,7 @@ function makeThrowingInner(message: string, kind: StrategyKind = 'prompt'): Invo
 function fakeLogger(): { logger: Logger; lines: { level: string; message: string }[] } {
   const lines: { level: string; message: string }[] = [];
   const logger: Logger = {
+    debug: (m) => { lines.push({ level: 'debug', message: m }); },
     info: (m) => { lines.push({ level: 'info', message: m }); },
     warn: (m) => { lines.push({ level: 'warn', message: m }); },
     error: (m) => { lines.push({ level: 'error', message: m }); },
@@ -141,5 +147,98 @@ describe('LoggingDecorator', () => {
 
     expect(promptDecorator.kind).toBe('prompt');
     expect(scriptDecorator.kind).toBe('script');
+  });
+});
+
+describe('createLeveledLogger', () => {
+  it('default level is info — debug calls are dropped, info/warn/error pass through', () => {
+    const { logger: sink, lines } = fakeLogger();
+    const leveled = createLeveledLogger({ sink });
+
+    leveled.debug('d');
+    leveled.info('i');
+    leveled.warn('w');
+    leveled.error('e');
+
+    expect(lines.map((l) => l.level)).toEqual(['info', 'warn', 'error']);
+  });
+
+  it('level=debug forwards every call', () => {
+    const { logger: sink, lines } = fakeLogger();
+    const leveled = createLeveledLogger({ level: 'debug', sink });
+
+    leveled.debug('d');
+    leveled.info('i');
+    leveled.warn('w');
+    leveled.error('e');
+
+    expect(lines.map((l) => l.level)).toEqual(['debug', 'info', 'warn', 'error']);
+  });
+
+  it('level=warn drops debug + info, keeps warn + error', () => {
+    const { logger: sink, lines } = fakeLogger();
+    const leveled = createLeveledLogger({ level: 'warn', sink });
+
+    leveled.debug('d');
+    leveled.info('i');
+    leveled.warn('w');
+    leveled.error('e');
+
+    expect(lines.map((l) => l.level)).toEqual(['warn', 'error']);
+  });
+
+  it('level=error keeps only error', () => {
+    const { logger: sink, lines } = fakeLogger();
+    const leveled = createLeveledLogger({ level: 'error', sink });
+
+    leveled.debug('d');
+    leveled.info('i');
+    leveled.warn('w');
+    leveled.error('e');
+
+    expect(lines.map((l) => l.level)).toEqual(['error']);
+  });
+
+  it('falls back to the stderrLogger sink when none supplied', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const leveled = createLeveledLogger({ level: 'debug' });
+
+    leveled.debug('hello');
+
+    expect(spy).toHaveBeenCalledWith('hello\n');
+    spy.mockRestore();
+  });
+});
+
+describe('envDebugOverride', () => {
+  it('returns null when neither var is set', () => {
+    expect(envDebugOverride({})).toBeNull();
+  });
+
+  it('returns "debug" when SKILLFORGE_DEBUG=1', () => {
+    expect(envDebugOverride({ SKILLFORGE_DEBUG: '1' })).toBe('debug');
+  });
+
+  it('returns "debug" when DEBUG=true', () => {
+    expect(envDebugOverride({ DEBUG: 'true' })).toBe('debug');
+  });
+
+  it('returns null when SKILLFORGE_DEBUG=0 / false / empty', () => {
+    expect(envDebugOverride({ SKILLFORGE_DEBUG: '0' })).toBeNull();
+    expect(envDebugOverride({ SKILLFORGE_DEBUG: 'false' })).toBeNull();
+    expect(envDebugOverride({ SKILLFORGE_DEBUG: '' })).toBeNull();
+  });
+
+  it('prefers SKILLFORGE_DEBUG over DEBUG when both are set', () => {
+    // Either path returns "debug" when truthy — the test confirms a SF-specific
+    // truthy value wins over DEBUG=0 (no silent regression to off).
+    expect(envDebugOverride({ SKILLFORGE_DEBUG: '1', DEBUG: '0' })).toBe('debug');
+  });
+
+  it('stderrLogger debug method writes to stderr (1.7.1 schema gap fix)', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stderrLogger.debug('dbg');
+    expect(spy).toHaveBeenCalledWith('dbg\n');
+    spy.mockRestore();
   });
 });

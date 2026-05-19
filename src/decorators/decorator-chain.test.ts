@@ -34,7 +34,7 @@ function makeSpyStrategy(result: InvocationResult): InvocationStrategy & { calls
 describe('DecoratorChain', () => {
   it('wrap() returns an InvocationStrategy', () => {
     const chain = new DecoratorChain({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
       defaultTimeoutMs: 5_000,
       cacheTtlMs: 10_000,
       cacheMaxEntries: 10,
@@ -48,7 +48,7 @@ describe('DecoratorChain', () => {
   it('wrap() chains Logging → Timeout → Cache → inner (inner strategy is called)', async () => {
     const infoSpy = vi.fn();
     const chain = new DecoratorChain({
-      logger: { info: infoSpy, warn: vi.fn(), error: vi.fn() },
+      logger: { debug: vi.fn(), info: infoSpy, warn: vi.fn(), error: vi.fn() },
       defaultTimeoutMs: 5_000,
       cacheTtlMs: 10_000,
       cacheMaxEntries: 10,
@@ -73,7 +73,7 @@ describe('DecoratorChain', () => {
     })();
 
     const chain = new DecoratorChain({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
       defaultTimeoutMs: 5_000,
       cacheTtlMs: 60_000,
       cacheMaxEntries: 10,

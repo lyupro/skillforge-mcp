@@ -53,7 +53,7 @@ function makeDeps(overrides: Partial<ScriptStrategyDeps> = {}): ScriptStrategyDe
   return {
     sandboxRunner: (overrideSandbox ?? defaultSandbox) as never,
     isGloballyAllowed: () => true,
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     clock: (() => {
       let t = 0;
       return () => t++;

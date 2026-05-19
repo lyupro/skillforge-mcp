@@ -240,6 +240,7 @@ describe('FrontmatterParser — name derivation', () => {
   it('emits an info log when a name is derived', async () => {
     const messages: string[] = [];
     const logger = {
+      debug: () => {},
       info: (m: string) => messages.push(m),
       warn: () => {},
       error: () => {},
