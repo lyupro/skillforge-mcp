@@ -7,6 +7,23 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.6.0 — Persistent registry index
+
+**Release date:** 2026-05-19
+
+The terminal `skills` commands now start fast on every call.
+
+- **Persistent on-disk index.** Each `skillforge skills get` runs as a fresh process, so its in-memory caches always started cold — every call walked every skill folder and parsed every skill file. SkillForge now keeps a registry snapshot in `<configDir>/cache/registry-index.json`; a subsequent process hydrates from it with one file read and parses only the skill you asked for. Over a 500-skill catalog, a warm `skills get` runs in ~28 ms versus ~109 ms cold — about a 3.8x speedup.
+- **Always correct.** The index carries a fingerprint of every skill file's path and modification time. Add, remove, or edit a skill and the next call rebuilds automatically. A corrupt or missing index simply triggers a full rebuild — never a crash.
+- **Batch fetch.** `skillforge skills get code-review,api-design,test-author` fetches several skills in one process. A single name keeps the original `--json` object shape; multiple names return `{ skills, errors }`.
+- **`skillforge skills reindex`** rebuilds the on-disk index on demand and prints a summary. **`--no-cache`** bypasses the index for a guaranteed full scan.
+
+**Engineering snapshot**
+
+- 684 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## v1.5.0 — Hermes Agent install target
 
 **Release date:** 2026-05-18

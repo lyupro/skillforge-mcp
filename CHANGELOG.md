@@ -2,6 +2,25 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-05-19
+
+A persistent on-disk registry index — fast warm starts for the CLI.
+
+### Added
+
+- **Persistent registry index.** SkillForge now writes a registry snapshot to `<configDir>/cache/registry-index.json`. Because each `skillforge skills get` runs as a fresh process, the in-memory caches always started empty and forced a full cold scan (recursive directory walk + frontmatter parse of every skill file). A subsequent process now hydrates the registry from the index with a single file read and parses only the one skill it was asked for. A benchmark over 500 synthetic skills shows a warm `skills get` at ~28 ms versus ~109 ms cold — roughly a 3.8x speedup.
+- **Fingerprint-based invalidation.** The index stores a stable hash of every skill file's path and modification time. Each call recomputes it from filesystem metadata only — no frontmatter parse — and rebuilds when a skill file is added, removed, or edited in place. A corrupt, missing, or version-mismatched index degrades silently to a full rebuild.
+- **Batch `skills get a,b,c`.** `skillforge skills get` accepts a comma-separated list of names and fetches them all in one process. With `--json`, a single name keeps the original object form for backward compatibility; multiple names emit `{ skills, errors }` so partial failures stay visible.
+- **`skillforge skills reindex`.** Forces a rebuild of the on-disk index regardless of its fingerprint (creating it if absent) and prints a summary — skill count, index path, and build time. Distinct from `reload`, which only rebuilds the in-memory registry of the current process.
+- **`--no-cache` flag** for the `skills` commands — bypasses the on-disk index and forces a full cold scan, for debugging and CI.
+- **`cache.indexEnabled` / `cache.indexPath`** config keys to toggle the index and override its location.
+
+### Verified
+
+- 684 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## [1.5.0] — 2026-05-18
 
 A fourth host installer target: Hermes Agent.
