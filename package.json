@@ -1,6 +1,6 @@
 {
   "name": "@lyupro/skillforge-mcp",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Universal Skills MCP Server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool (Claude Code / Codex CLI / any MCP client).",
   "keywords": [
     "mcp",

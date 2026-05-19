@@ -7,6 +7,24 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.7.0 — Extensible skill format registry
+
+**Release date:** 2026-05-19
+
+SkillForge can now recognize a new LLM's skill layout without a code release — and a canonical file without a `name:` no longer disappears from the registry.
+
+- **Config-driven format registry.** "What counts as a skill file" lives in `config.skillFormats`: a list of descriptors with a unique `id`, a `match` rule (exact filename, filename glob, or non-empty frontmatter field), a `nameField`, a `deriveNameFromDir` flag, plus `enabled` and `priority`. The four built-ins (`claude`, `codex`, `persona`, `custom`) ship by default; operator entries merge over them by `id`. Supporting Gemini Gem files is one line: `skillforge formats add gemini-gem --filename GEMINI.md --derive-name-from-dir`.
+- **Directory-name derivation.** Canonical files (`SKILL.md` / `AGENTS.md`) without a `name:` in frontmatter used to be silently skipped — they were structurally unaddressable. They now register under a kebab-normalized parent-directory name (`migration-architect/SKILL.md` → `migration-architect`). The behaviour is per-format opt-in and limited to filename / filename-glob matches, so a sibling `README.md` never becomes a skill.
+- **`skillforge formats` subcommand.** `formats list`, `formats add`, `formats remove`, `formats enable`, `formats disable` — same atomic-write story as `folders`. Built-ins can be disabled or replaced (by reusing their id), but not removed.
+- **Provenance.** `skills get` and `skills list` JSON now carry `formatId` (which descriptor matched) and `nameSource` (`"frontmatter"` or `"directory"`). The text view of `skills get` shows them too. A derived name emits an info log to stderr.
+- **Name-collision diagnostics.** When the same name registers from more than one folder, SkillForge logs the kept winner and the ignored copies on stderr. The priority-based resolver still picks the winner — no crash.
+
+**Engineering snapshot**
+
+- 749 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## v1.6.0 — Persistent registry index
 
 **Release date:** 2026-05-19

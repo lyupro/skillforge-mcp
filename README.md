@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.6.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `skills` subcommands, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 684 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.7.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` subcommands, config-driven skill format registry with directory-name derivation, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 749 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -106,6 +106,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
 | `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
 | `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `enable` / `disable` / `reset`. |
+| `formats` | Manage the skill format registry — `list` / `add` / `remove` / `enable` / `disable`. Add support for a new LLM's layout (e.g. Gemini Gem files) without a code release. |
 | `skills` | Inspect the skill registry from the terminal — `list` (with `--search`, `--source`, `--folder`, `--folder-tag`, `--json`, `--folder-fmt`), `get <names>` (comma-separated for a batch fetch), `reload`, `reindex`. `--no-cache` bypasses the on-disk index. |
 | `--version`, `-v` | Print the package version. |
 | `--help`, `-h` | Print combined usage. |

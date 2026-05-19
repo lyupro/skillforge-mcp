@@ -2,6 +2,28 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-05-19
+
+A config-driven skill format registry — add support for new LLM layouts without a code release.
+
+### Added
+
+- **Skill format registry.** "What counts as a skill file" is no longer hardcoded. SkillForge reads a declarative list of format descriptors (`config.skillFormats`) — four built-ins (`claude`, `codex`, `persona`, `custom`) merged with operator entries. Each descriptor carries an `id`, a `match` rule (exact filename, filename glob, or non-empty frontmatter field), a `nameField`, a `deriveNameFromDir` flag, plus `enabled` and `priority`. Adding support for, say, Gemini Gem files (`GEMINI.md`) is now a one-line config edit.
+- **Directory-name derivation.** A canonical file (`SKILL.md` / `AGENTS.md`) without a `name:` in its frontmatter is no longer unaddressable — the skill registers under a kebab-normalized parent-directory name (`migration-architect/SKILL.md` → `migration-architect`). Derivation is a per-format opt-in (`deriveNameFromDir: true`) limited to filename and filename-glob matches, so a sibling `README.md` is never mistaken for a skill.
+- **`skillforge formats` subcommand.** Manage the registry from the shell: `formats list`, `formats add <id> --filename|--filename-glob|--frontmatter-field …`, `formats remove`, `formats enable`, `formats disable`. Built-ins can be disabled or replaced by reusing their id, but not removed.
+- **Provenance in JSON output.** `skills get` and `skills list` carry two new optional fields per skill: `formatId` (which descriptor matched) and `nameSource` (`"frontmatter"` or `"directory"`). The `skills get` text view shows them too. A derived name also emits an info log to stderr.
+- **Name-collision diagnostics.** When a skill name registers from more than one folder, SkillForge logs the kept winner and the ignored copies on stderr; the resolver still picks the highest-priority folder, no crash.
+
+### Changed
+
+- The persistent on-disk registry index gained two optional fields (`formatId`, `nameSource`). `INDEX_VERSION` bumps to `2`; any older index loads as `null` and triggers a normal rebuild — never a crash.
+
+### Verified
+
+- 749 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## [1.6.0] — 2026-05-19
 
 A persistent on-disk registry index — fast warm starts for the CLI.
