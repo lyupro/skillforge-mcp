@@ -185,8 +185,19 @@ The on-disk index is invalidated automatically: a fingerprint of every skill fil
 
 | Field | Default | Effect |
 |-------|---------|--------|
-| `level` | `"info"` | Reserved — `stderrLogger` currently emits all `info` / `warn` / `error` calls regardless. Will gate output when the level is wired through. |
+| `level` | `"info"` | Threshold for stderr diagnostics. `debug < info < warn < error`. At `info` (default) per-file skip lines (e.g. a sub-`README.md` inside a skill folder that has no `name:`) are suppressed — they were never going to be skills. Folder-scan failures, blacklist exclusions, and name collisions still surface. `debug` flips the per-file skip lines back on for troubleshooting. `warn` keeps only warnings and errors. |
 | `file` | `null` | Reserved — when set, will tee stderr to a log file. |
+
+#### Verbosity controls
+
+The threshold is sourced in this order — first non-empty value wins:
+
+1. **CLI flag.** `skillforge skills … --verbose` (or `-v`) forces `debug`; `--quiet` (or `-q`) forces `warn`. Per-process override.
+2. **Env override.** `SKILLFORGE_DEBUG=1` or `DEBUG=1` flips the level to `debug`. Set either to a falsy value (`0`, `false`, empty) to opt out.
+3. **Persisted config.** `logging.level` in `config.json`.
+4. **Schema default.** `info`.
+
+stdout stays reserved for JSON payloads (`--json` mode on every command). Diagnostics always go to stderr, so a pipeline like `skillforge skills get foo --json | jq .` is never broken by a logger line landing on the wrong stream.
 
 ### `invocation`
 
