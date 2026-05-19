@@ -15,6 +15,7 @@
  * caller treats that as a cache miss and performs a full rebuild.
  */
 
+import { unlink } from 'node:fs/promises';
 import { z } from 'zod';
 import { readJsonSafe, writeJsonAtomic } from '../installers/atomic-write.js';
 
@@ -26,6 +27,12 @@ const indexEntrySchema = z.object({
   folder: z.string(),
   format: z.enum(['claude', 'codex', 'persona', 'custom']),
   mtimeMs: z.number(),
+  // description + tags are carried so `skills list` (which filters on them)
+  // stays correct when the registry is hydrated from the index instead of a
+  // full parse. Both are populated for free during the rebuild that writes
+  // the index — no extra disk read.
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 const registryIndexSchema = z.object({
@@ -73,5 +80,18 @@ export class SkillIndexStore {
   /** Atomically write the index to disk. */
   async save(index: RegistryIndex): Promise<void> {
     await writeJsonAtomic(this.#path, index);
+  }
+
+  /**
+   * Remove the on-disk index. Called by the watchers when a skill file or the
+   * config changes — the next process then rebuilds from scratch. Best-effort:
+   * a missing file is not an error.
+   */
+  async invalidate(): Promise<void> {
+    try {
+      await unlink(this.#path);
+    } catch {
+      // Already absent — nothing to invalidate.
+    }
   }
 }

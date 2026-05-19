@@ -14,6 +14,8 @@ describe('configSchema', () => {
     expect(result.cache.metadataTtlMs).toBe(300_000);
     expect(result.cache.contentTtlMs).toBe(300_000);
     expect(result.cache.maxSizeMb).toBe(50);
+    expect(result.cache.indexEnabled).toBe(true);
+    expect(result.cache.indexPath).toBeUndefined();
     expect(result.watcher.enabled).toBe(true);
     expect(result.watcher.debounceMs).toBe(500);
     expect(result.logging.level).toBe('info');
@@ -50,6 +52,14 @@ describe('configSchema', () => {
 
   it('throws when cache.maxSizeMb is negative', () => {
     expect(() => configSchema.parse({ cache: { maxSizeMb: -5 } })).toThrow();
+  });
+
+  it('accepts an explicit cache.indexEnabled and cache.indexPath', () => {
+    const result = configSchema.parse({
+      cache: { indexEnabled: false, indexPath: '/custom/index.json' },
+    });
+    expect(result.cache.indexEnabled).toBe(false);
+    expect(result.cache.indexPath).toBe('/custom/index.json');
   });
 
   it('throws when logging.level is an unknown string', () => {

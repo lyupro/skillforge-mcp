@@ -33,6 +33,11 @@ const cacheSchema = z
     metadataTtlMs: z.number().nonnegative().default(300_000),
     contentTtlMs: z.number().nonnegative().default(300_000),
     maxSizeMb: z.number().nonnegative().default(50),
+    // Persistent on-disk registry index — survives between CLI processes.
+    indexEnabled: z.boolean().default(true),
+    // Absolute path to the index file. Optional — when absent the path is
+    // computed as <configDir>/cache/registry-index.json.
+    indexPath: z.string().optional(),
   })
   .passthrough();
 

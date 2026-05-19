@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { ConfigStore, defaultConfigPath } from './config-store.js';
+import { ConfigStore, defaultConfigPath, defaultIndexPath } from './config-store.js';
 import { defaultConfig } from './config-schema.js';
 import type { PersistedConfig } from './config-schema.js';
 
@@ -215,5 +215,17 @@ describe('defaultConfigPath()', () => {
     const result = defaultConfigPath();
     const expected = join(homedir(), '.lyupro', '.skillforge', 'config.json');
     expect(result).toBe(expected);
+  });
+});
+
+describe('defaultIndexPath()', () => {
+  it('derives the index path from the default config directory', () => {
+    const expected = join(homedir(), '.lyupro', '.skillforge', 'cache', 'registry-index.json');
+    expect(defaultIndexPath()).toBe(expected);
+  });
+
+  it('honors an explicit config path', () => {
+    const result = defaultIndexPath(join('/opt', 'sf', 'config.json'));
+    expect(result).toBe(join('/opt', 'sf', 'cache', 'registry-index.json'));
   });
 });

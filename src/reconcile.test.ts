@@ -50,6 +50,13 @@ function makeDeps(opts: {
     resolver: new SkillResolver(),
     metadataCache: new SkillMetadataCache({ ttlMs: 300_000 }),
     contentCache: new SkillContentCache({ ttlMs: 300_000 }),
+    indexStore: {
+      load: vi.fn(async () => null),
+      save: vi.fn(async () => {}),
+      invalidate: vi.fn(async () => {}),
+      getPath: () => '/fake/registry-index.json',
+    } as unknown as ServerDeps['indexStore'],
+    indexEnabled: false,
     scanner: {
       scan: vi.fn(async (folder: string) => opts.scanResults.get(folder) ?? []),
     } as unknown as ServerDeps['scanner'],

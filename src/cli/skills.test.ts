@@ -71,6 +71,13 @@ function makeFakeDeps(
       markFresh: () => undefined,
       invalidate: () => undefined,
     },
+    indexStore: {
+      load: async () => null,
+      save: async () => undefined,
+      invalidate: async () => undefined,
+      getPath: () => '/fake/registry-index.json',
+    },
+    indexEnabled: false,
     parser: {
       parseFile: async () => content,
     },

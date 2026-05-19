@@ -10,7 +10,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadResolvedConfig, buildPatternScanner } from './config.js';
-import { ConfigStore, defaultConfigPath } from './config/index.js';
+import { ConfigStore, defaultConfigPath, defaultIndexPath } from './config/index.js';
 import { FolderWatcher, ConfigWatcher } from './watcher/index.js';
 import { reconcileFolders } from './reconcile.js';
 import { startRuntime, registerShutdown } from './runtime.js';
@@ -19,6 +19,7 @@ import {
   SkillResolver,
   SkillMetadataCache,
   SkillContentCache,
+  SkillIndexStore,
 } from './core/index.js';
 import { FrontmatterParser, FileScanner } from './parser/index.js';
 import { PromptStrategy } from './handlers/index.js';
@@ -143,7 +144,13 @@ export function buildServer(deps: ServerDeps): McpServer {
   return server;
 }
 
-export async function buildDeps(): Promise<ServerDeps> {
+export interface BuildDepsOptions {
+  /** When true the persistent on-disk registry index is disabled regardless
+   *  of config — forces a full cold scan. Set by the CLI `--no-cache` flag. */
+  disableCache?: boolean;
+}
+
+export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerDeps> {
   const configStore = new ConfigStore({ filePath: defaultConfigPath() });
   const resolved = await loadResolvedConfig(process.env, configStore);
   const scanner = buildPatternScanner(resolved.persisted);
@@ -152,16 +159,23 @@ export async function buildDeps(): Promise<ServerDeps> {
     patternScanner: scanner,
   });
   const metadataCache = new SkillMetadataCache({ ttlMs: resolved.ttlMs });
+
+  // `deps` is assigned at the end of buildDeps; every closure below runs only
+  // after start(), so the reference is populated by then.
+  let deps: ServerDeps;
   const folderWatcher = new FolderWatcher({
     folders: resolved.folders,
     debounceMs: resolved.persisted.watcher.debounceMs,
-    onBatch: () => metadataCache.invalidate(),
+    onBatch: () => {
+      // Invalidate the in-memory cache and drop the on-disk index so the next
+      // process rebuilds rather than hydrating from a now-stale snapshot.
+      metadataCache.invalidate();
+      void deps.indexStore.invalidate();
+    },
   });
 
   // The config CLI runs as a separate process and rewrites config.json on disk.
   // This watcher reconciles a running server with those out-of-process edits.
-  // `deps` is assigned at the end of buildDeps; the closure runs only after start().
-  let deps: ServerDeps;
   const configWatcher = new ConfigWatcher({
     configPath: defaultConfigPath(),
     onChange: async () => {
@@ -203,6 +217,15 @@ export async function buildDeps(): Promise<ServerDeps> {
     cacheMaxEntries: invocation.cacheMaxEntries,
   });
 
+  // Persistent on-disk registry index. Path is the config knob `cache.indexPath`
+  // when set, otherwise <configDir>/cache/registry-index.json. The `--no-cache`
+  // CLI flag wins over the `cache.indexEnabled` config knob.
+  const cacheCfg = resolved.persisted.cache;
+  const indexStore = new SkillIndexStore(
+    cacheCfg.indexPath ?? defaultIndexPath(defaultConfigPath()),
+  );
+  const indexEnabled = options.disableCache === true ? false : cacheCfg.indexEnabled;
+
   deps = {
     folders: resolved.folders,
     configStore,
@@ -210,6 +233,8 @@ export async function buildDeps(): Promise<ServerDeps> {
     resolver: new SkillResolver(),
     metadataCache,
     contentCache: new SkillContentCache({ ttlMs: resolved.ttlMs }),
+    indexStore,
+    indexEnabled,
     parser: new FrontmatterParser(),
     scanner: new FileScanner(),
     factory,

@@ -96,3 +96,12 @@ export class ConfigStore {
 export function defaultConfigPath(): string {
   return join(homedir(), '.lyupro', '.skillforge', 'config.json');
 }
+
+/**
+ * Default location of the persistent registry index, derived from the config
+ * directory: `<configDir>/cache/registry-index.json`. Pass an explicit config
+ * path to keep the index alongside a non-default config (used by tests).
+ */
+export function defaultIndexPath(configPath: string = defaultConfigPath()): string {
+  return join(dirname(configPath), 'cache', 'registry-index.json');
+}

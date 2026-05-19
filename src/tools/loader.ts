@@ -1,4 +1,7 @@
+import { stat } from 'node:fs/promises';
 import type { SkillMetadata } from '../core/types.js';
+import type { RegistryIndex } from '../core/index.js';
+import { INDEX_VERSION, computeFingerprint } from '../core/index.js';
 import type { ServerDeps } from '../server-deps.js';
 
 export interface RebuildOptions {
@@ -13,10 +16,69 @@ export interface RebuildStats {
   errors: Array<{ path: string; message: string }>;
 }
 
+/** Build a RegistryIndex snapshot from the current registry contents plus a
+ *  freshly computed fingerprint of the configured folders. */
+async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
+  const fingerprint = await computeFingerprint(deps.folders);
+  const skills: RegistryIndex['skills'] = {};
+
+  for (const meta of deps.registry.getAll()) {
+    let mtimeMs = 0;
+    try {
+      mtimeMs = (await stat(meta.sourcePath)).mtimeMs;
+    } catch {
+      // File vanished between scan and snapshot — fingerprint will catch it.
+    }
+    skills[meta.name] = {
+      sourcePath: meta.sourcePath,
+      folder: meta.folder,
+      format: meta.format,
+      mtimeMs,
+      description: meta.description,
+      tags: meta.tags,
+    };
+  }
+
+  return { version: INDEX_VERSION, fingerprint, skills };
+}
+
+/** Persist the current registry to the on-disk index. Best-effort: a write
+ *  failure is logged but never aborts the rebuild. */
+async function persistIndex(deps: ServerDeps): Promise<void> {
+  if (!deps.indexEnabled) return;
+  try {
+    const snapshot = await buildIndexSnapshot(deps);
+    await deps.indexStore.save(snapshot);
+  } catch (err) {
+    console.error(`[skillforge] failed to write registry index: ${String(err)}`);
+  }
+}
+
+/** Hydrate the in-memory registry from an on-disk index without parsing skill
+ *  files. Skill bodies are fetched lazily on `get` by parsing the one target
+ *  file. The content cache is left empty — `handleGet` re-parses on miss. */
+function hydrateFromIndex(deps: ServerDeps, index: RegistryIndex): void {
+  deps.registry.clear();
+  deps.contentCache.clear();
+  for (const [name, entry] of Object.entries(index.skills)) {
+    const meta: SkillMetadata = {
+      name,
+      sourcePath: entry.sourcePath,
+      folder: entry.folder,
+      format: entry.format,
+      description: entry.description,
+      tags: entry.tags,
+    };
+    deps.registry.register(meta);
+  }
+  deps.metadataCache.markFresh();
+}
+
 /** Unconditionally invalidate caches and rescan all configured folders.
  *  Pure rebuild — does NOT consult metadataCache.isValid() first.
  *  Used by both ensureRegistryFresh (after the freshness gate) and the
- *  reload tool (which always wants a fresh scan regardless of TTL). */
+ *  reload tool (which always wants a fresh scan regardless of TTL).
+ *  After a successful scan the on-disk index is rewritten. */
 export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): Promise<RebuildStats> {
   const errorSink = opts?.errorSink;
 
@@ -97,6 +159,9 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
 
   deps.metadataCache.markFresh();
 
+  // Persist the rebuilt registry to the on-disk index for the next process.
+  await persistIndex(deps);
+
   const skills = deps.registry.getAll().map((s) => s.name).sort();
   const errors = errorSink ?? [];
   return { skills, errors };
@@ -104,11 +169,29 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
 
 /**
  * Ensures the skill registry is populated and fresh.
- * Scans all configured folders on first call or when the TTL has expired.
+ *
+ * Freshness gate, in order:
+ *   1. In-memory metadata cache valid (same process, within TTL) → return.
+ *   2. On-disk index enabled and its fingerprint still matches the configured
+ *      folders → hydrate the registry from the index, skip the cold scan.
+ *   3. Otherwise → full rebuild + index rewrite.
+ *
  * Individual bad files and missing folders are logged to stderr and skipped —
  * one failure never aborts the whole scan.
  */
 export async function ensureRegistryFresh(deps: ServerDeps): Promise<void> {
   if (deps.metadataCache.isValid()) return;
+
+  if (deps.indexEnabled) {
+    const index = await deps.indexStore.load();
+    if (index !== null) {
+      const fingerprint = await computeFingerprint(deps.folders);
+      if (fingerprint === index.fingerprint) {
+        hydrateFromIndex(deps, index);
+        return;
+      }
+    }
+  }
+
   await rebuildRegistry(deps);  // errors go to stderr via default behavior
 }

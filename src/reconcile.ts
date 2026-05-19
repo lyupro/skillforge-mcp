@@ -11,6 +11,9 @@ export async function reconcileFolders(deps: ServerDeps): Promise<PersistedConfi
   deps.folders.splice(0, deps.folders.length, ...resolved.folders);
   deps.blacklistFilter.setManualBlacklist(persisted.blacklist);
   deps.metadataCache.invalidate();
+  // Drop the on-disk index too — the configured folder set may have changed,
+  // and ensureRegistryFresh below will rebuild and rewrite a fresh index.
+  await deps.indexStore.invalidate();
   try {
     await deps.folderWatcher.setFolders(deps.folders);
   } catch (err) {

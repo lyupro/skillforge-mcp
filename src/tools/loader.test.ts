@@ -10,6 +10,8 @@ import { BlacklistFilter } from '../security/blacklist-filter.js';
 import { PatternScanner } from '../security/pattern-scanner.js';
 import { SandboxRunner } from '../security/sandbox-runner.js';
 import { DecoratorChain, stderrLogger } from '../decorators/index.js';
+import { INDEX_VERSION, computeFingerprint } from '../core/index.js';
+import type { RegistryIndex } from '../core/index.js';
 import type { ServerDeps } from '../server-deps.js';
 import type { SkillContent } from '../core/types.js';
 
@@ -36,6 +38,8 @@ function makeDeps(overrides: Partial<{
   parseError?: Map<string, Error>;
   cacheValid: boolean;
   blacklistFilter: BlacklistFilter;
+  indexStore: ServerDeps['indexStore'];
+  indexEnabled: boolean;
 }>): ServerDeps {
   const folders = overrides.folders ?? ['/skills'];
   const scanResults = overrides.scanResults ?? new Map();
@@ -56,6 +60,13 @@ function makeDeps(overrides: Partial<{
       ttlMs: 300_000,
     } as unknown as SkillMetadataCache,
     contentCache: new SkillContentCache({ ttlMs: 300_000 }),
+    indexStore: overrides.indexStore ?? ({
+      load: vi.fn(async () => null),
+      save: vi.fn(async () => {}),
+      invalidate: vi.fn(async () => {}),
+      getPath: () => '/fake/registry-index.json',
+    } as unknown as ServerDeps['indexStore']),
+    indexEnabled: overrides.indexEnabled ?? false,
     scanner: {
       scan: vi.fn(async (folder: string) => {
         if (scanErrors.has(folder)) throw scanErrors.get(folder)!;
@@ -269,5 +280,101 @@ describe('rebuildRegistry', () => {
     const stats = await rebuildRegistry(deps);
 
     expect(stats.skills).toEqual(['alpha-skill', 'zebra-skill']);
+  });
+});
+
+describe('ensureRegistryFresh — on-disk index', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function makeIndexStore(initial: RegistryIndex | null): {
+    store: ServerDeps['indexStore'];
+    saved: RegistryIndex[];
+  } {
+    let current = initial;
+    const saved: RegistryIndex[] = [];
+    const store = {
+      load: vi.fn(async () => current),
+      save: vi.fn(async (index: RegistryIndex) => {
+        current = index;
+        saved.push(index);
+      }),
+      invalidate: vi.fn(async () => {
+        current = null;
+      }),
+      getPath: () => '/fake/registry-index.json',
+    } as unknown as ServerDeps['indexStore'];
+    return { store, saved };
+  }
+
+  it('hydrates the registry from a valid index without scanning', async () => {
+    // Two nonexistent folders both fingerprint to the empty-set hash, so a
+    // matching fingerprint is deterministic without touching real files.
+    const folders = ['/no-such-folder'];
+    const fingerprint = await computeFingerprint(folders);
+    const index: RegistryIndex = {
+      version: INDEX_VERSION,
+      fingerprint,
+      skills: {
+        'cached-skill': {
+          sourcePath: '/no-such-folder/cached-skill.md',
+          folder: '/no-such-folder',
+          format: 'claude',
+          mtimeMs: 1,
+          description: 'from index',
+          tags: ['x'],
+        },
+      },
+    };
+    const { store } = makeIndexStore(index);
+    const deps = makeDeps({ folders, indexStore: store, indexEnabled: true });
+    const scanSpy = vi.spyOn(deps.scanner, 'scan');
+
+    await ensureRegistryFresh(deps);
+
+    expect(scanSpy).not.toHaveBeenCalled();
+    const hydrated = deps.registry.get('cached-skill');
+    expect(hydrated?.description).toBe('from index');
+    expect(hydrated?.format).toBe('claude');
+  });
+
+  it('rebuilds + persists when the index fingerprint no longer matches', async () => {
+    const folders = ['/no-such-folder'];
+    const staleIndex: RegistryIndex = {
+      version: INDEX_VERSION,
+      fingerprint: 'stale-does-not-match',
+      skills: {},
+    };
+    const { store, saved } = makeIndexStore(staleIndex);
+    const deps = makeDeps({ folders, indexStore: store, indexEnabled: true });
+    const scanSpy = vi.spyOn(deps.scanner, 'scan');
+
+    await ensureRegistryFresh(deps);
+
+    expect(scanSpy).toHaveBeenCalled();
+    expect(saved.length).toBe(1);
+  });
+
+  it('rebuilds when no index exists, then persists a fresh one', async () => {
+    const folders = ['/no-such-folder'];
+    const { store, saved } = makeIndexStore(null);
+    const deps = makeDeps({ folders, indexStore: store, indexEnabled: true });
+
+    await ensureRegistryFresh(deps);
+
+    expect(saved.length).toBe(1);
+    expect(saved[0]!.version).toBe(INDEX_VERSION);
+  });
+
+  it('skips the index entirely when indexEnabled is false', async () => {
+    const folders = ['/no-such-folder'];
+    const { store } = makeIndexStore(null);
+    const deps = makeDeps({ folders, indexStore: store, indexEnabled: false });
+
+    await ensureRegistryFresh(deps);
+
+    expect(store.load).not.toHaveBeenCalled();
+    expect(store.save).not.toHaveBeenCalled();
   });
 });
