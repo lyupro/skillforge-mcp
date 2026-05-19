@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.7.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` subcommands, config-driven skill format registry with directory-name derivation, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 749 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.7.1** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` subcommands, config-driven skill format registry with directory-name derivation, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 781 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 

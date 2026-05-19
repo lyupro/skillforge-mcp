@@ -7,6 +7,22 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.7.1 — Quieter defaults, candidate-aware skip lines
+
+**Release date:** 2026-05-19
+
+Routine per-file noise gone from the default stderr stream — only files SkillForge could actually load surface as a skip.
+
+- **Leveled logger.** Output is now filtered by threshold. Default `info` keeps folder-scan failures, blacklist exclusions, and name collisions visible; per-file skip lines drop to `debug` and stay hidden until you ask for them. `--verbose` / `-v` lowers the threshold to `debug`; `--quiet` / `-q` raises it to `warn`. `SKILLFORGE_DEBUG=1` or `DEBUG=1` also flip to `debug` for one-shot troubleshooting. The `logging.level` config key drives the default when no flag or env override is present.
+- **Candidate filter via the format registry.** A `.md` becomes a skill candidate only when at least one enabled format descriptor matches it. A `README.md`, `references/*.md`, or `assets/*.md` next to a `SKILL.md` no longer fails the `name:` check and produces no log line at any level — they were never going to be skills. A canonical `SKILL.md` / `AGENTS.md` with broken frontmatter still produces a debug skip you can surface with `--verbose`.
+- **Reload summary breakdown.** `skillforge skills reload` now reports `folder-failures` vs `file-skips` alongside the total error count.
+
+**Engineering snapshot**
+
+- 781 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## v1.7.0 — Extensible skill format registry
 
 **Release date:** 2026-05-19

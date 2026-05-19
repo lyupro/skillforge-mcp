@@ -2,6 +2,25 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] — 2026-05-19
+
+Quieter default diagnostics — operator terminals stay clean, and only files SkillForge can actually load show up as skip lines.
+
+### Added
+
+- **Leveled stderr logger.** Diagnostics are now filtered by threshold (`debug` / `info` / `warn` / `error`). Default is `info`; folder-scan failures, blacklist exclusions, and name collisions still surface, but routine per-file skip lines are suppressed. `--verbose` / `-v` flips the threshold to `debug`; `--quiet` / `-q` raises it to `warn`. The `SKILLFORGE_DEBUG=1` or `DEBUG=1` env vars also force `debug`. The `logging.level` config key drives the default when no flag/env override is set.
+- **`skills reload` error breakdown.** The summary now splits the error sink into `folder-failures` vs `file-skips`, so an operator sees the failure distribution at a glance instead of one opaque count.
+
+### Changed
+
+- **Candidate-file rule wired through the format registry.** A `.md` inside a configured folder is treated as a skill candidate only when at least one enabled format descriptor matches its filename (or non-empty frontmatter field). A non-candidate file is silently ignored at every log level — `README.md`, `references/*.md`, and `assets/*.md` siblings inside a skill directory no longer produce per-file skip lines. A candidate file with broken frontmatter still logs a debug skip so real defects are reachable with `--verbose`.
+
+### Verified
+
+- 781 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## [1.7.0] — 2026-05-19
 
 A config-driven skill format registry — add support for new LLM layouts without a code release.
