@@ -94,3 +94,25 @@ export function formatReloadStats(
   }
   return `${lines.join('\n')}\n`;
 }
+
+/** Render the reindex summary in human-readable form. */
+export function formatReindexStats(
+  stats: RebuildStats,
+  indexPath: string,
+  buildMs: number,
+): string {
+  const lines: string[] = [];
+  lines.push(`Reindex complete.`);
+  lines.push(`  skills:    ${stats.skills.length}`);
+  lines.push(`  indexPath: ${indexPath}`);
+  lines.push(`  buildTime: ${buildMs}ms`);
+  if (stats.errors.length > 0) {
+    lines.push(`  errors:    ${stats.errors.length}`);
+    for (const e of stats.errors) {
+      lines.push(`    ${e.path}: ${e.message}`);
+    }
+  } else {
+    lines.push(`  errors:    0`);
+  }
+  return `${lines.join('\n')}\n`;
+}

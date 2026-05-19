@@ -11,9 +11,10 @@
  * reflects disk truth, NOT the state of any running MCP server session.
  *
  * Usage:
- *   skillforge skills list [flags]       List skills from the registry
- *   skillforge skills get <name> [flags] Print full content of one skill
- *   skillforge skills reload             Force a registry rebuild from disk
+ *   skillforge skills list [flags]        List skills from the registry
+ *   skillforge skills get <names> [flags] Print full content of one or more skills
+ *   skillforge skills reload              Force a registry rebuild from disk
+ *   skillforge skills reindex             Force a rebuild of the on-disk index
  *
  * list flags:
  *   --search <s>          Case-insensitive substring filter over name + description.
@@ -24,7 +25,11 @@
  *   --json                Emit raw JSON instead of a table.
  *
  * get flags:
- *   --json                Emit raw JSON instead of human-readable output.
+ *   --json                Emit raw JSON. A single name keeps the object form;
+ *                         a comma-separated list emits { skills, errors }.
+ *
+ * global flags:
+ *   --no-cache            Bypass the on-disk index — force a full cold scan.
  *
  * This module keeps only the entry point + action dispatch; the handlers,
  * table formatting, and shared parsing helpers live in sibling modules.
@@ -35,13 +40,15 @@ import {
   handleSkillsList,
   handleSkillsGet,
   handleSkillsReload,
+  handleSkillsReindex,
 } from './skills-handlers.js';
 
 export interface SkillsDeps {
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
-  /** Override the ServerDeps factory — tests inject a fake deps object here. */
-  buildDeps?: () => Promise<ServerDeps>;
+  /** Override the ServerDeps factory — tests inject a fake deps object here.
+   *  `disableCache` is set when the caller passed `--no-cache`. */
+  buildDeps?: (opts?: { disableCache?: boolean }) => Promise<ServerDeps>;
 }
 
 const USAGE = `skillforge skills — view and reload skills from the terminal.
@@ -57,10 +64,20 @@ Actions:
                         Flags: --search <s>, --source <format>,
                                --folder <path|alias>, --folder-tag <tag>,
                                --folder-fmt alias|path (default alias), --json
-  get <name> [flags]  Print the full content of one skill.
+  get <names> [flags] Print the full content of one or more skills.
+                        Pass a comma-separated list (a,b,c) to fetch several
+                        skills in one process. With --json a single name keeps
+                        the object form; multiple names emit { skills, errors }.
                         Flags: --json
   reload              Force a registry rebuild + config reconcile from disk.
                         Prints: N folders, M skills, and any per-file errors.
+  reindex             Force a rebuild of the persistent on-disk registry index
+                        regardless of its fingerprint (creates it if absent).
+                        Prints: skill count, index path, build time.
+
+Global flags:
+  --no-cache          Bypass the persistent on-disk index — forces a full
+                        cold scan (debug / CI).
 
 Examples:
   skillforge skills list
@@ -69,7 +86,10 @@ Examples:
   skillforge skills list --source claude
   skillforge skills get code-review
   skillforge skills get code-review --json
+  skillforge skills get code-review,api-design,test-author --json
   skillforge skills reload
+  skillforge skills reindex
+  skillforge skills get code-review --no-cache
 `;
 
 /**
@@ -83,9 +103,14 @@ export async function main(rawArgv: string[], deps: SkillsDeps = {}): Promise<nu
   const stderr = deps.stderr ?? ((text: string) => process.stderr.write(text));
 
   const action = rawArgv[0];
-  const rest = rawArgv.slice(1);
+  // `--no-cache` is a global flag — strip it from the action args before the
+  // per-action flag parsers see it, and use it to disable the on-disk index.
+  const rawRest = rawArgv.slice(1);
+  const disableCache = rawRest.includes('--no-cache');
+  const rest = rawRest.filter((a) => a !== '--no-cache');
 
-  if (action === undefined || (action !== 'list' && action !== 'get' && action !== 'reload')) {
+  const known = action === 'list' || action === 'get' || action === 'reload' || action === 'reindex';
+  if (action === undefined || !known) {
     if (action !== undefined) {
       stderr(`skillforge skills: unknown action: ${action}\n\n`);
     }
@@ -95,11 +120,11 @@ export async function main(rawArgv: string[], deps: SkillsDeps = {}): Promise<nu
 
   let serverDeps: ServerDeps;
   try {
-    const factory = deps.buildDeps ?? (async () => {
+    const factory = deps.buildDeps ?? (async (opts?: { disableCache?: boolean }) => {
       const { buildDeps } = await import('../server.js');
-      return buildDeps();
+      return buildDeps(opts);
     });
-    serverDeps = await factory();
+    serverDeps = await factory({ disableCache });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     stderr(`skillforge skills: failed to initialise registry: ${msg}\n`);
@@ -114,6 +139,8 @@ export async function main(rawArgv: string[], deps: SkillsDeps = {}): Promise<nu
         return await handleSkillsGet(serverDeps, rest, stdout, stderr);
       case 'reload':
         return await handleSkillsReload(serverDeps, rest, stdout, stderr);
+      case 'reindex':
+        return await handleSkillsReindex(serverDeps, rest, stdout, stderr);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

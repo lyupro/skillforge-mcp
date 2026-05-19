@@ -54,12 +54,14 @@ Commands:
   folders      Manage skill folders from the terminal (list/add/remove/reset).
                Run "skillforge-mcp folders" for sub-action usage.
                  Example: skillforge-mcp folders add ~/.lyupro/skills
-  skills       View and reload skills from the terminal (list/get/reload).
-               The CLI reads disk, not a live server session.
+  skills       View and reload skills from the terminal
+               (list/get/reload/reindex). The CLI reads disk, not a live
+               server session.
                Run "skillforge-mcp skills" for sub-action usage.
                  Example: skillforge-mcp skills list
                  Example: skillforge-mcp skills get code-review
-                 Example: skillforge-mcp skills reload
+                 Example: skillforge-mcp skills get code-review,api-design
+                 Example: skillforge-mcp skills reindex
 
 Options:
   --help, -h   Show this message.

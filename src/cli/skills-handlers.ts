@@ -11,12 +11,18 @@
 
 import { resolve } from 'node:path';
 import type { ServerDeps } from '../server-deps.js';
+import type { SkillContent } from '../core/types.js';
 import { handleList as toolHandleList } from '../tools/list.js';
 import { handleGet as toolHandleGet } from '../tools/get.js';
 import { rebuildRegistry } from '../tools/loader.js';
 import { reconcileFolders } from '../reconcile.js';
 import { parseListFlags, resolveFolderArg, buildFolderAliasMap } from './skills-shared.js';
-import { formatSkillsTable, formatSkillGet, formatReloadStats } from './skills-format.js';
+import {
+  formatSkillsTable,
+  formatSkillGet,
+  formatReloadStats,
+  formatReindexStats,
+} from './skills-format.js';
 
 export async function handleSkillsList(
   deps: ServerDeps,
@@ -76,8 +82,19 @@ export async function handleSkillsGet(
   stdout: (t: string) => void,
   stderr: (t: string) => void,
 ): Promise<number> {
-  const name = rest[0];
-  if (name === undefined || name.startsWith('--')) {
+  const nameArg = rest[0];
+  if (nameArg === undefined || nameArg.startsWith('--')) {
+    stderr(`skillforge skills get: missing <name>\n`);
+    return 2;
+  }
+
+  // A single token may carry several comma-separated names — one process, one
+  // registry load, then a per-name lookup. Single name keeps the object form.
+  const names = nameArg
+    .split(',')
+    .map((n) => n.trim())
+    .filter((n) => n.length > 0);
+  if (names.length === 0) {
     stderr(`skillforge skills get: missing <name>\n`);
     return 2;
   }
@@ -93,17 +110,73 @@ export async function handleSkillsGet(
     }
   }
 
-  try {
-    const skill = await toolHandleGet(deps, { name });
-    if (asJson) {
-      stdout(`${JSON.stringify(skill, null, 2)}\n`);
-    } else {
-      stdout(formatSkillGet(skill));
+  // Single name — preserve the historical object form (backward compat).
+  if (names.length === 1) {
+    try {
+      const skill = await toolHandleGet(deps, { name: names[0]! });
+      if (asJson) {
+        stdout(`${JSON.stringify(skill, null, 2)}\n`);
+      } else {
+        stdout(formatSkillGet(skill));
+      }
+      return 0;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      stderr(`skillforge skills get: ${msg}\n`);
+      return 1;
     }
+  }
+
+  // Batch — collect successes and per-name errors; one bad name never aborts.
+  const skills: SkillContent[] = [];
+  const errors: Array<{ name: string; message: string }> = [];
+  for (const name of names) {
+    try {
+      skills.push(await toolHandleGet(deps, { name }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push({ name, message: msg });
+    }
+  }
+
+  if (asJson) {
+    stdout(`${JSON.stringify({ skills, errors }, null, 2)}\n`);
+  } else {
+    for (const skill of skills) {
+      stdout(formatSkillGet(skill));
+      stdout('\n');
+    }
+    for (const e of errors) {
+      stderr(`skillforge skills get: ${e.name}: ${e.message}\n`);
+    }
+  }
+  return errors.length > 0 ? 1 : 0;
+}
+
+export async function handleSkillsReindex(
+  deps: ServerDeps,
+  rest: string[],
+  stdout: (t: string) => void,
+  stderr: (t: string) => void,
+): Promise<number> {
+  for (const arg of rest) {
+    stderr(`skillforge skills reindex: unknown flag: ${arg}\n`);
+    return 2;
+  }
+
+  try {
+    const startedAt = Date.now();
+    // Force a full rebuild regardless of fingerprint; rebuildRegistry writes
+    // a fresh on-disk index as part of the rebuild.
+    deps.metadataCache.invalidate();
+    await deps.indexStore.invalidate();
+    const stats = await rebuildRegistry(deps);
+    const buildMs = Date.now() - startedAt;
+    stdout(formatReindexStats(stats, deps.indexStore.getPath(), buildMs));
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    stderr(`skillforge skills get: ${msg}\n`);
+    stderr(`skillforge skills reindex: ${msg}\n`);
     return 1;
   }
 }
