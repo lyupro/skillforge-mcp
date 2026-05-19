@@ -147,6 +147,20 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
   // Resolve conflicts and register winners.
   for (const [name, group] of candidates) {
     const winner = deps.resolver.resolve(group, deps.folders);
+    // A name shared by skills in more than one folder — warn and keep the
+    // resolver's priority-ordered winner; the losing copies stay on disk
+    // unregistered. Derived directory names flow through this same path, so a
+    // derived name colliding with a frontmatter name is deduped here too.
+    if (group.length > 1) {
+      const losers = group
+        .filter((m) => m !== winner)
+        .map((m) => m.sourcePath)
+        .join(', ');
+      console.error(
+        `[skillforge] name collision for "${name}" — kept ${winner.sourcePath}, ` +
+          `ignored: ${losers}`,
+      );
+    }
     deps.registry.register(winner);
 
     // Retrieve the full content for the winner from the temporary keyed cache.

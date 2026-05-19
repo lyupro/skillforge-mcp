@@ -202,6 +202,7 @@ describe('ensureRegistryFresh', () => {
   });
 
   it('resolves conflict to higher-priority folder winner', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const folder1 = '/priority-1';
     const folder2 = '/priority-2';
     const content1 = makeContent('shared-skill', folder1);
@@ -224,6 +225,10 @@ describe('ensureRegistryFresh', () => {
     expect(winner?.folder).toBe(folder1);
     const cachedContent = deps.contentCache.get('shared-skill');
     expect(cachedContent?.folder).toBe(folder1);
+    // The collision is warned on stderr; no crash, single registered winner.
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining('name collision for "shared-skill"'),
+    );
   });
 });
 
