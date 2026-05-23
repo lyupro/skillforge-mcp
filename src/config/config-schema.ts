@@ -22,6 +22,17 @@ const securitySchema = z
     auditPatterns: z
       .array(z.string())
       .default(['shell=True', 'eval\\(', 'exec\\(', 'base64\\.b64decode']),
+    // What the auto-audit scans inside a SKILL.md. `scripts` (default) extracts
+    // only fenced executable code blocks (python/sh/js/…) — prose that merely
+    // *mentions* a pattern (a security skill documenting `exec(` in a table) is
+    // not a runnable vector, especially with allowScripts:false, so scanning it
+    // is a false positive. `all` restores whole-body scanning for the paranoid.
+    auditTarget: z.enum(['scripts', 'all']).default('scripts'),
+    // Skill names exempt from the auto-audit (case-sensitive exact match). Lets a
+    // legitimately pattern-heavy skill (security auditors, lint rule packs) load
+    // even when its scripts contain the very anti-patterns it teaches. Manual
+    // blacklist still applies. Mirrors the `--allow-audit` reindex flag.
+    auditExceptions: z.array(z.string()).default([]),
     allowScripts: z.boolean().default(false),
     sandboxScripts: z.boolean().default(true),
     sandboxRestrictedPaths: z.array(z.string()).default(['~/.ssh', '~/.aws', '~/.gnupg']),

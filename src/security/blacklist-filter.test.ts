@@ -69,10 +69,12 @@ describe('BlacklistFilter', () => {
       expect(verdict).toEqual({ allowed: true });
     });
 
-    it('rejects a skill whose body matches a pattern, returning first match pattern source', () => {
+    it('rejects a skill whose executable code matches a pattern, returning first match pattern source', () => {
       const scanner = new PatternScanner({ patterns: ['eval\\(', 'exec\\('] });
       const filter = new BlacklistFilter({ patternScanner: scanner });
-      const verdict = filter.evaluate(makeContent('evil-skill', 'eval(user_input)'));
+      // Default auditTarget is 'scripts' — the match must live in a fenced code block.
+      const body = ['```js', 'eval(user_input)', '```'].join('\n');
+      const verdict = filter.evaluate(makeContent('evil-skill', body));
       expect(verdict).toEqual({ allowed: false, reason: 'audit', pattern: 'eval\\(' });
     });
   });
@@ -128,6 +130,67 @@ describe('BlacklistFilter', () => {
       expect(filter.evaluate(makeContent('baz')).allowed).toBe(true);
       // isNoop is false (2 real entries)
       expect(filter.isNoop()).toBe(false);
+    });
+  });
+
+  describe('auditExceptions', () => {
+    it('exempts a named skill from the auto-audit', () => {
+      const scanner = new PatternScanner({ patterns: ['exec\\('] });
+      const filter = new BlacklistFilter({
+        patternScanner: scanner,
+        auditExceptions: ['skill-security-auditor'],
+        auditTarget: 'all',
+      });
+      // body would normally trip the audit
+      const exempt = filter.evaluate(makeContent('skill-security-auditor', 'exec(x)'));
+      expect(exempt).toEqual({ allowed: true });
+      // a different skill with the same body is still rejected
+      const other = filter.evaluate(makeContent('other', 'exec(x)'));
+      expect(other).toEqual({ allowed: false, reason: 'audit', pattern: 'exec\\(' });
+    });
+
+    it('manual blacklist still applies to an audit-exempt name', () => {
+      const scanner = new PatternScanner({ patterns: ['exec\\('] });
+      const filter = new BlacklistFilter({
+        patternScanner: scanner,
+        manualBlacklist: ['both'],
+        auditExceptions: ['both'],
+      });
+      expect(filter.evaluate(makeContent('both', 'exec(x)'))).toEqual({
+        allowed: false,
+        reason: 'manual',
+      });
+    });
+  });
+
+  describe('auditTarget', () => {
+    const proseOnly = '| `exec(`, `execSync(` | Substring | command injection |';
+
+    it('scripts mode (default) ignores a pattern that only appears in prose', () => {
+      const scanner = new PatternScanner({ patterns: ['exec\\('] });
+      const filter = new BlacklistFilter({ patternScanner: scanner });
+      expect(filter.evaluate(makeContent('docs-skill', proseOnly))).toEqual({ allowed: true });
+    });
+
+    it('all mode flags the same prose pattern', () => {
+      const scanner = new PatternScanner({ patterns: ['exec\\('] });
+      const filter = new BlacklistFilter({ patternScanner: scanner, auditTarget: 'all' });
+      expect(filter.evaluate(makeContent('docs-skill', proseOnly))).toEqual({
+        allowed: false,
+        reason: 'audit',
+        pattern: 'exec\\(',
+      });
+    });
+
+    it('scripts mode still flags a pattern inside a fenced executable block', () => {
+      const scanner = new PatternScanner({ patterns: ['shell=True'] });
+      const filter = new BlacklistFilter({ patternScanner: scanner });
+      const body = ['```python', 'run(cmd, shell=True)', '```'].join('\n');
+      expect(filter.evaluate(makeContent('runs-code', body))).toEqual({
+        allowed: false,
+        reason: 'audit',
+        pattern: 'shell=True',
+      });
     });
   });
 });

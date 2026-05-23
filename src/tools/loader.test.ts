@@ -211,7 +211,8 @@ describe('ensureRegistryFresh', () => {
     const { logger, lines } = captureLogger();
     const folder = '/skills';
     const evilContent = makeContent('evil-skill', folder);
-    evilContent.body = 'eval(user_input)';
+    // Default auditTarget is 'scripts' — the pattern must live in fenced code.
+    evilContent.body = '```js\neval(user_input)\n```';
     const cleanContent = makeContent('clean-skill', folder);
     cleanContent.body = 'print("hello")';
 

@@ -168,6 +168,8 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
   const blacklistFilter = new BlacklistFilter({
     manualBlacklist: resolved.persisted.blacklist,
     patternScanner: scanner,
+    auditExceptions: resolved.persisted.security.auditExceptions,
+    auditTarget: resolved.persisted.security.auditTarget,
   });
   const metadataCache = new SkillMetadataCache({ ttlMs: resolved.ttlMs });
 
