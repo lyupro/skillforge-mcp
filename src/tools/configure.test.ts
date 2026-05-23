@@ -309,7 +309,7 @@ describe('handleConfigure — set_blacklist', () => {
     await handleConfigure(deps, { action: 'set_blacklist', blacklist: ['foo', 'bar'] });
 
     // Live filter now rejects 'foo'
-    expect(deps.blacklistFilter.evaluate(content)).toEqual({ allowed: false, reason: 'manual' });
+    expect(deps.blacklistFilter.evaluate(content)).toEqual({ allowed: false, reason: 'manual', pattern: 'foo' });
   });
 
   it('throws when blacklist arg is missing', async () => {

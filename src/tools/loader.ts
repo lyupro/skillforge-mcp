@@ -139,7 +139,7 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
       const verdict = deps.blacklistFilter.evaluate(content);
       if (!verdict.allowed) {
         const detail = verdict.reason === 'manual'
-          ? 'blacklisted by name'
+          ? `blacklisted by "${verdict.pattern}"`
           : `audit hit: ${verdict.pattern}`;
         // Blacklist rejection drops a skill from the registry — operator must
         // see it. Always warn, never route through the sink.

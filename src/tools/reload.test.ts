@@ -256,7 +256,7 @@ describe('handleReload — error collection', () => {
     expect(result.errors).toHaveLength(0);
     expect(result.loaded).toBe(1);
     // Blacklist log fires at warn level (security-significant).
-    const excludeLines = lines.filter((l) => l.message.includes('blacklisted by name'));
+    const excludeLines = lines.filter((l) => l.message.includes('blacklisted by "excluded-skill"'));
     expect(excludeLines).toHaveLength(1);
     expect(excludeLines[0]!.level).toBe('warn');
   });

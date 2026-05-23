@@ -202,7 +202,7 @@ describe('ensureRegistryFresh', () => {
 
     expect(deps.registry.has('skill-x')).toBe(false);
     expect(deps.registry.has('skill-y')).toBe(true);
-    const excludeLines = lines.filter((l) => l.message.includes('blacklisted by name'));
+    const excludeLines = lines.filter((l) => l.message.includes('blacklisted by "skill-x"'));
     expect(excludeLines).toHaveLength(1);
     expect(excludeLines[0]!.level).toBe('warn');
   });
@@ -388,7 +388,7 @@ describe('ensureRegistryFresh — leveled logger integration', () => {
 
     await ensureRegistryFresh(deps);
 
-    expect(sink.lines.some((l) => l.level === 'warn' && l.message.includes('blacklisted by name'))).toBe(true);
+    expect(sink.lines.some((l) => l.level === 'warn' && l.message.includes('blacklisted by "bad-skill"'))).toBe(true);
   });
 });
 

@@ -45,7 +45,7 @@ describe('BlacklistFilter', () => {
     it('rejects a skill whose name is in the list', () => {
       const filter = new BlacklistFilter({ manualBlacklist: ['danger-skill'] });
       const verdict = filter.evaluate(makeContent('danger-skill'));
-      expect(verdict).toEqual({ allowed: false, reason: 'manual' });
+      expect(verdict).toEqual({ allowed: false, reason: 'manual', pattern: 'danger-skill' });
     });
 
     it('allows a skill whose name is not in the list (no scanner)', () => {
@@ -58,6 +58,59 @@ describe('BlacklistFilter', () => {
       const filter = new BlacklistFilter({ manualBlacklist: ['Danger'] });
       expect(filter.evaluate(makeContent('danger')).allowed).toBe(true);
       expect(filter.evaluate(makeContent('Danger')).allowed).toBe(false);
+    });
+  });
+
+  describe('name-glob patterns', () => {
+    it('rejects skills matching a name glob and carries the pattern', () => {
+      const filter = new BlacklistFilter({ manualBlacklist: ['wiki-*'] });
+      expect(filter.evaluate(makeContent('wiki-foo'))).toEqual({
+        allowed: false,
+        reason: 'manual',
+        pattern: 'wiki-*',
+      });
+      expect(filter.evaluate(makeContent('other')).allowed).toBe(true);
+    });
+
+    it('? matches exactly one char', () => {
+      const filter = new BlacklistFilter({ manualBlacklist: ['cs-?'] });
+      expect(filter.evaluate(makeContent('cs-a')).allowed).toBe(false);
+      expect(filter.evaluate(makeContent('cs-ab')).allowed).toBe(true);
+    });
+  });
+
+  describe('path-glob patterns', () => {
+    function makePathContent(name: string, sourcePath: string, folder: string) {
+      return { ...makeContent(name), sourcePath, folder };
+    }
+
+    it('matches a ** path glob against the folder-relative source path', () => {
+      const filter = new BlacklistFilter({ manualBlacklist: ['**/agenthub/**'] });
+      const hit = makePathContent('x', '/skills/agenthub/x/SKILL.md', '/skills');
+      expect(filter.evaluate(hit)).toEqual({
+        allowed: false,
+        reason: 'manual',
+        pattern: '**/agenthub/**',
+      });
+      const miss = makePathContent('y', '/skills/other/y/SKILL.md', '/skills');
+      expect(filter.evaluate(miss).allowed).toBe(true);
+    });
+
+    it('matches a precise path prefix glob', () => {
+      const filter = new BlacklistFilter({ manualBlacklist: ['engineering/llm-wiki/**'] });
+      const hit = makePathContent('w', '/root/engineering/llm-wiki/w/SKILL.md', '/root');
+      expect(filter.evaluate(hit).allowed).toBe(false);
+      const miss = makePathContent('w', '/root/engineering/other/SKILL.md', '/root');
+      expect(filter.evaluate(miss).allowed).toBe(true);
+    });
+
+    it('exact name takes precedence over an overlapping glob', () => {
+      const filter = new BlacklistFilter({ manualBlacklist: ['wiki-foo', 'wiki-*'] });
+      expect(filter.evaluate(makeContent('wiki-foo'))).toEqual({
+        allowed: false,
+        reason: 'manual',
+        pattern: 'wiki-foo',
+      });
     });
   });
 
@@ -88,7 +141,7 @@ describe('BlacklistFilter', () => {
         patternScanner: scanner,
       });
       const verdict = filter.evaluate(makeContent('blocked', 'eval(x)'));
-      expect(verdict).toEqual({ allowed: false, reason: 'manual' });
+      expect(verdict).toEqual({ allowed: false, reason: 'manual', pattern: 'blocked' });
       expect(scanSpy).not.toHaveBeenCalled();
     });
   });
@@ -97,7 +150,11 @@ describe('BlacklistFilter', () => {
     it('after setManualBlacklist([x]), evaluate({name:x,...}) returns manual rejection', () => {
       const filter = new BlacklistFilter();
       filter.setManualBlacklist(['x']);
-      expect(filter.evaluate(makeContent('x'))).toEqual({ allowed: false, reason: 'manual' });
+      expect(filter.evaluate(makeContent('x'))).toEqual({
+        allowed: false,
+        reason: 'manual',
+        pattern: 'x',
+      });
     });
 
     it('after setManualBlacklist([]), a previously-blacklisted name is now allowed', () => {
@@ -159,6 +216,7 @@ describe('BlacklistFilter', () => {
       expect(filter.evaluate(makeContent('both', 'exec(x)'))).toEqual({
         allowed: false,
         reason: 'manual',
+        pattern: 'both',
       });
     });
   });
