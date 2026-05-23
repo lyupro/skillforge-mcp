@@ -51,4 +51,36 @@ describe('SkillResolver', () => {
     const b = makeSkill('x', '/b');
     expect(resolver.resolve([b, a], ['/a', '/a', '/b'])).toBe(a);
   });
+
+  it('same folder, two installed bundle versions — highest semver wins (any input order)', () => {
+    const root = '/cache/claude-code-skills';
+    const older: SkillMetadata = {
+      name: 'dependency-auditor',
+      sourcePath: `${root}/engineering-advanced-skills/2.3.0/dependency-auditor/SKILL.md`,
+      folder: root,
+      format: 'claude',
+    };
+    const newer: SkillMetadata = {
+      name: 'dependency-auditor',
+      sourcePath: `${root}/engineering-advanced-skills/2.4.4/skills/dependency-auditor/SKILL.md`,
+      folder: root,
+      format: 'claude',
+    };
+    expect(resolver.resolve([older, newer], [root])).toBe(newer);
+    expect(resolver.resolve([newer, older], [root])).toBe(newer);
+  });
+
+  it('same folder, no parseable version — keeps input order (stable)', () => {
+    const f = '/cache';
+    const a: SkillMetadata = { name: 'x', sourcePath: `${f}/a/SKILL.md`, folder: f, format: 'claude' };
+    const b: SkillMetadata = { name: 'x', sourcePath: `${f}/b/SKILL.md`, folder: f, format: 'claude' };
+    expect(resolver.resolve([a, b], [f])).toBe(a);
+  });
+
+  it('higher folder priority beats a newer version in a lower-priority folder', () => {
+    const hi: SkillMetadata = { name: 'x', sourcePath: '/hi/1.0.0/x/SKILL.md', folder: '/hi', format: 'claude' };
+    const lo: SkillMetadata = { name: 'x', sourcePath: '/lo/9.9.9/x/SKILL.md', folder: '/lo', format: 'claude' };
+    // /hi ranks first — version tiebreak only applies within the same rank.
+    expect(resolver.resolve([lo, hi], ['/hi', '/lo'])).toBe(hi);
+  });
 });
