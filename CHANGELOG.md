@@ -2,6 +2,33 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-05-24
+
+Full CLI parity for security knobs, manual blacklist patterns, and version-policy pins — all previously requiring hand-edits to `config.json` or the `skills__configure` MCP tool.
+
+### Added
+
+- **`skillforge security` CLI group** — terminal management of the audit and blacklist settings across four sub-areas:
+  - `security audit-exceptions list|add|remove|clear` — manage `config.security.auditExceptions` (skills whose example code legitimately contains flagged patterns).
+  - `security audit-target [scripts|all]` — get or set `config.security.auditTarget` (`scripts` default scans only fenced code blocks; `all` scans the whole body).
+  - `security audit-patterns list` — read-only view of the code-seeded audit patterns (regex + label).
+  - `security blacklist list|add|remove|clear` — manage `config.blacklist`; `list` shows each entry's classified KIND (`exact` / `name-glob` / `path-glob`).
+  All sub-commands accept `--json` on `list`, idempotent `add`, `clear --yes`, and the global `--verbose` / `--quiet` flags. After any mutation a reindex hint is printed.
+- **`skillforge version-policy` CLI group** — terminal management of per-bundle version pinning:
+  - `version-policy list [--json]` — show the current policy map with resolved kinds.
+  - `version-policy set <bundle> <latest|major.minor.patch>` — pin a bundle to an exact version or restore highest-semver resolution with `latest`.
+  - `version-policy remove <bundle>` — remove a single pin (reverts to `latest`).
+  - `version-policy clear --yes` — wipe the entire policy map.
+- **Blacklist pattern types** — `config.blacklist` entries are now auto-classified by syntax: a plain name is an exact match (unchanged); an entry with `*` or `?` but no `/` is a glob over the skill name (e.g. `wiki-*`); any entry containing `/` is a glob over the skill source path relative to its registered root folder (e.g. `**/agenthub/**`). Implemented with a self-contained glob compiler — no new dependency. The exclude log and the filter verdict carry the matched pattern and its kind.
+
+### Changed
+
+- Blacklist exact-name matching is unchanged — all existing entries in `config.blacklist` continue to work with no migration needed.
+
+### Verified
+
+- 867 tests passing + 2 skipped; `tsc --noEmit` clean; all source files ≤ 400 lines.
+
 ## [1.8.0] — 2026-05-23
 
 Security-teaching skills load again, and the freshest installed version of a bundle wins.

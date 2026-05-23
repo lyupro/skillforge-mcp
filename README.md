@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.8.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` subcommands, config-driven skill format registry with directory-name derivation, code-scoped security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 811 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.9.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` + `security` + `version-policy` subcommands, blacklist name-glob and path-glob patterns, config-driven skill format registry with directory-name derivation, code-scoped security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 867 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -108,6 +108,8 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `enable` / `disable` / `reset`. |
 | `formats` | Manage the skill format registry — `list` / `add` / `remove` / `enable` / `disable`. Add support for a new LLM's layout (e.g. Gemini Gem files) without a code release. |
 | `skills` | Inspect the skill registry from the terminal — `list` (with `--search`, `--source`, `--folder`, `--folder-tag`, `--json`, `--folder-fmt`), `get <names>` (comma-separated for a batch fetch), `reload`, `reindex`. `--no-cache` bypasses the on-disk index. |
+| `security` | Manage security knobs from the terminal — `audit-exceptions list\|add\|remove\|clear`, `audit-target [scripts\|all]`, `audit-patterns list`, `blacklist list\|add\|remove\|clear`. |
+| `version-policy` | Manage per-bundle version pins from the terminal — `list`, `set <bundle> <latest\|x.y.z>`, `remove <bundle>`, `clear`. |
 | `--version`, `-v` | Print the package version. |
 | `--help`, `-h` | Print combined usage. |
 
@@ -153,6 +155,71 @@ skillforge folders list --tag work         # only folders tagged "work"
 
 If you register a folder that already lives inside another tool's native skill store (a Claude Code plugin cache or a Gemini CLI extension), `folders add` prints a hint to disable the duplicate source so the same skills don't load twice. SkillForge only prints the hint — it never edits another tool's config.
 
+### Manage security settings from the terminal — `skillforge security`
+
+All security knobs that previously required hand-editing `config.json` or the `skills__configure` MCP tool are now available from the shell:
+
+```bash
+# Audit exceptions — skills whose example code legitimately contains flagged patterns
+skillforge security audit-exceptions list [--json]
+skillforge security audit-exceptions add <skill-name>
+skillforge security audit-exceptions remove <skill-name>
+skillforge security audit-exceptions clear --yes
+
+# Audit target — what to scan: fenced code blocks only (default) or the whole body
+skillforge security audit-target            # print current value
+skillforge security audit-target scripts    # scan only executable fenced blocks (default)
+skillforge security audit-target all        # scan the entire skill body
+
+# Audit patterns — read-only view of the code-seeded regex patterns
+skillforge security audit-patterns list [--json]
+
+# Manual blacklist — exclude skills by name or glob pattern
+skillforge security blacklist list [--json]           # shows KIND for each entry
+skillforge security blacklist add <pattern>
+skillforge security blacklist remove <pattern>
+skillforge security blacklist clear --yes
+```
+
+**Blacklist pattern kinds** — entries are auto-classified by syntax:
+
+| Kind | Syntax | Example | Matches |
+|------|--------|---------|---------|
+| `exact` | plain name, no wildcards or `/` | `dangerous-skill` | skill named exactly `dangerous-skill` |
+| `name-glob` | contains `*` or `?`, no `/` | `wiki-*` | any skill whose name matches `wiki-*` |
+| `path-glob` | contains `/` | `**/agenthub/**` | skill whose source path (relative to its folder root) matches the glob |
+
+```bash
+skillforge security blacklist add "wiki-*"              # name-glob: all wiki-* skills
+skillforge security blacklist add "**/agenthub/**"      # path-glob: skills under any agenthub/ subtree
+skillforge security blacklist add dangerous-skill       # exact match (unchanged behaviour)
+skillforge security blacklist list                      # shows KIND column for each entry
+```
+
+`list` accepts `--json`. `add` is idempotent — adding an existing pattern is a no-op. `clear` requires `--yes`. A reindex hint is printed after any mutation. All commands accept the global `--verbose` / `--quiet` flags.
+
+### Manage version pins from the terminal — `skillforge version-policy`
+
+Per-bundle version policy (previously only settable via `config.json` hand-edits) is now a first-class CLI group:
+
+```bash
+skillforge version-policy list [--json]                    # show current policy map with kinds
+skillforge version-policy set <bundle> 2.4.4               # pin bundle to an exact version
+skillforge version-policy set <bundle> latest              # restore highest-semver resolution
+skillforge version-policy remove <bundle>                  # remove a single pin (reverts to latest)
+skillforge version-policy clear --yes                      # wipe the entire policy map
+```
+
+When one recursive root holds two installed versions of a bundle, the highest semver wins by default (`latest`). Pin a bundle to freeze it against newer installs:
+
+```bash
+skillforge version-policy set apple-hig 1.3.2   # always use 1.3.2, ignore newer installs
+skillforge version-policy set apple-hig latest   # unpin, highest installed wins again
+skillforge version-policy list                   # verify the current map
+```
+
+`list` accepts `--json`. `clear` requires `--yes`. A reindex hint is printed after any mutation.
+
 ## MCP tool surface
 
 | Tool | Purpose |
@@ -184,7 +251,7 @@ For shared content across multiple tools, the convention is `~/.lyupro/skills/` 
 - **Config file:** `~/.lyupro/.skillforge/config.json` (resolved cross-platform via `os.homedir()`). Schema-validated via Zod; missing → schema defaults; corrupt JSON / schema → loud error with the file path.
 - **Merge order for folders:** `SKILLFORGE_FOLDERS` env (when set) > persisted `folders[]` with `enabled: true` sorted by `priority` desc > built-in default.
 - **Auto-audit:** `security.autoAudit: true` (default) scans skills on load against `security.auditPatterns` (default: `shell=True`, `eval(`, `exec(`, `base64.b64decode`). Matched skills are excluded and logged to stderr. `security.auditTarget` controls *what* is scanned: `scripts` (default) only fenced executable code blocks, so a skill that documents a pattern in prose is not flagged; `all` scans the whole body. `security.auditExceptions: string[]` is a case-sensitive name allowlist that skips the audit for a skill whose example code legitimately contains a flagged pattern (the manual blacklist still applies).
-- **Manual blacklist:** `blacklist: string[]` excludes skills by exact name (case-sensitive). Short-circuits before the audit step.
+- **Manual blacklist:** `blacklist: string[]` excludes skills by pattern (case-sensitive). Three kinds are auto-classified by syntax: a plain name is an **exact** match; an entry with `*` or `?` but no `/` is a **name-glob** matched against the skill name (e.g. `wiki-*`, `*-draft`); any entry containing `/` is a **path-glob** matched against the skill source path relative to its registered root folder (e.g. `**/agenthub/**`, `internal/*/draft-*`). Existing plain-name entries are unchanged. Short-circuits before the audit step.
 - **Version policy:** `versionPolicy: { "<bundle>": "latest" | "<major.minor.patch>" }`. When one recursive root holds two installed versions of a bundle, the highest semver wins by default (`latest`). Pin a bundle to an exact version, or pin it to its current version to freeze it against newer installs.
 - **Hot reload:** chokidar watches all configured folders for `.md` add/change/unlink events. Debounced batches invalidate the metadata cache so the next `skills__list` re-scans. Folders mutated via `skills__configure` auto-re-watch via the same diff path.
 
