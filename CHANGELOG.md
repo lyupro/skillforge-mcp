@@ -2,6 +2,24 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-05-23
+
+Security-teaching skills load again, and the freshest installed version of a bundle wins.
+
+### Added
+
+- **`security.auditTarget`** (`scripts` default, or `all`). The auto-audit now scans only fenced executable code blocks (`python`, `sh`, `js`, …) by default rather than the whole document. A skill whose prose merely *mentions* a flagged pattern — a security guide documenting `exec(` or `shell=True` in a table — no longer excludes itself. With `allowScripts:false` such a mention is never executed, so scanning it was a false positive. Set `all` to restore whole-body scanning.
+- **`security.auditExceptions`** — a case-sensitive skill-name allowlist that bypasses the auto-audit for skills whose example code legitimately contains flagged patterns (security auditors, lint rule packs). The manual blacklist still applies.
+- **`versionPolicy`** — a per-bundle map (`<bundle>` → `latest` | `<major.minor.patch>`). Pin a bundle to an exact version, or pin it to its current version to freeze it against newer installs. Defaults to `latest`.
+
+### Fixed
+
+- **Highest installed version wins on a name collision.** When one recursive root holds two installed versions of a bundle (`…/<bundle>/2.3.0/…` and `…/2.4.4/…`), the resolver now keeps the highest semver instead of whichever the filesystem enumerated first. Cross-folder priority still takes precedence; an unparseable version falls back to stable input order.
+
+### Verified
+
+- 811 tests passing + 2 skipped.
+
 ## [1.7.1] — 2026-05-19
 
 Quieter default diagnostics — operator terminals stay clean, and only files SkillForge can actually load show up as skip lines.

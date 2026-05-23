@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.7.1** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` subcommands, config-driven skill format registry with directory-name derivation, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 781 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.8.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` subcommands, config-driven skill format registry with directory-name derivation, code-scoped security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 811 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -183,8 +183,9 @@ For shared content across multiple tools, the convention is `~/.lyupro/skills/` 
 
 - **Config file:** `~/.lyupro/.skillforge/config.json` (resolved cross-platform via `os.homedir()`). Schema-validated via Zod; missing → schema defaults; corrupt JSON / schema → loud error with the file path.
 - **Merge order for folders:** `SKILLFORGE_FOLDERS` env (when set) > persisted `folders[]` with `enabled: true` sorted by `priority` desc > built-in default.
-- **Auto-audit:** `security.autoAudit: true` (default) scans skill bodies on load against `security.auditPatterns` (default: `shell=True`, `eval(`, `exec(`, `base64.b64decode`). Matched skills are excluded and logged to stderr.
+- **Auto-audit:** `security.autoAudit: true` (default) scans skills on load against `security.auditPatterns` (default: `shell=True`, `eval(`, `exec(`, `base64.b64decode`). Matched skills are excluded and logged to stderr. `security.auditTarget` controls *what* is scanned: `scripts` (default) only fenced executable code blocks, so a skill that documents a pattern in prose is not flagged; `all` scans the whole body. `security.auditExceptions: string[]` is a case-sensitive name allowlist that skips the audit for a skill whose example code legitimately contains a flagged pattern (the manual blacklist still applies).
 - **Manual blacklist:** `blacklist: string[]` excludes skills by exact name (case-sensitive). Short-circuits before the audit step.
+- **Version policy:** `versionPolicy: { "<bundle>": "latest" | "<major.minor.patch>" }`. When one recursive root holds two installed versions of a bundle, the highest semver wins by default (`latest`). Pin a bundle to an exact version, or pin it to its current version to freeze it against newer installs.
 - **Hot reload:** chokidar watches all configured folders for `.md` add/change/unlink events. Debounced batches invalidate the metadata cache so the next `skills__list` re-scans. Folders mutated via `skills__configure` auto-re-watch via the same diff path.
 
 ## Skill format
