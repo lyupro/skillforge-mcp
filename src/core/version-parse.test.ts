@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseVersionFromPath, compareVersions, matchesPin } from './version-parse.js';
+import { parseVersionFromPath, parseBundleFromPath, compareVersions, matchesPin } from './version-parse.js';
 
 describe('parseVersionFromPath', () => {
   it('parses the version segment from a posix cache path', () => {
@@ -22,6 +22,19 @@ describe('parseVersionFromPath', () => {
 
   it('returns the first version-looking segment', () => {
     expect(parseVersionFromPath('/a/1.2.3/b/9.9.9/x')!.raw).toBe('1.2.3');
+  });
+});
+
+describe('parseBundleFromPath', () => {
+  it('returns the segment before the version segment', () => {
+    expect(parseBundleFromPath('/cache/claude-code-skills/engineering-advanced-skills/2.4.4/skills/x/SKILL.md'))
+      .toBe('engineering-advanced-skills');
+  });
+  it('returns null when no version segment exists', () => {
+    expect(parseBundleFromPath('/cache/bundle/skills/x/SKILL.md')).toBeNull();
+  });
+  it('returns null when the version is the first segment (nothing precedes)', () => {
+    expect(parseBundleFromPath('2.4.4/x/SKILL.md')).toBeNull();
   });
 });
 

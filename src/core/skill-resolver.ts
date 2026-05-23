@@ -1,11 +1,27 @@
 import type { SkillMetadata } from './types.js';
-import { parseVersionFromPath, compareVersions } from './version-parse.js';
+import {
+  parseVersionFromPath,
+  parseBundleFromPath,
+  compareVersions,
+  matchesPin,
+} from './version-parse.js';
 
 export class SkillResolver {
+  readonly #versionPolicy: Record<string, string>;
+
+  constructor(versionPolicy: Record<string, string> = {}) {
+    this.#versionPolicy = versionPolicy;
+  }
+
   resolve(candidates: SkillMetadata[], folderPriority: string[]): SkillMetadata {
     if (candidates.length === 0) {
       throw new Error('SkillResolver.resolve: candidates must not be empty');
     }
+    if (candidates.length === 1) {
+      return candidates[0]!;
+    }
+
+    candidates = this.#applyVersionPolicy(candidates);
     if (candidates.length === 1) {
       return candidates[0]!;
     }
@@ -36,6 +52,24 @@ export class SkillResolver {
     }
 
     return best;
+  }
+
+  /**
+   * Drop candidates whose bundle is pinned to a different version. A pin of
+   * `latest` (or absent) is a no-op. If a pin matches no candidate the pin is
+   * ignored rather than dropping the skill entirely (operator typo shouldn't
+   * make a skill vanish — the collision log still shows what was available).
+   */
+  #applyVersionPolicy(candidates: SkillMetadata[]): SkillMetadata[] {
+    const kept = candidates.filter((c) => {
+      const bundle = parseBundleFromPath(c.sourcePath);
+      if (bundle === null) return true;
+      const pin = this.#versionPolicy[bundle];
+      if (pin === undefined || pin === 'latest') return true;
+      const version = parseVersionFromPath(c.sourcePath);
+      return version !== null && matchesPin(version, pin);
+    });
+    return kept.length > 0 ? kept : candidates;
   }
 
   #rankOf(folder: string, priorityIndex: ReadonlyMap<string, number>): number {

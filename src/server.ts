@@ -252,7 +252,7 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
     folders: resolved.folders,
     configStore,
     registry: new SkillRegistry(),
-    resolver: new SkillResolver(),
+    resolver: new SkillResolver(resolved.persisted.versionPolicy),
     metadataCache,
     contentCache: new SkillContentCache({ ttlMs: resolved.ttlMs }),
     indexStore,

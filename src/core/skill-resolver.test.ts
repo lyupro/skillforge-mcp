@@ -83,4 +83,35 @@ describe('SkillResolver', () => {
     // /hi ranks first — version tiebreak only applies within the same rank.
     expect(resolver.resolve([lo, hi], ['/hi', '/lo'])).toBe(hi);
   });
+
+  describe('versionPolicy', () => {
+    const root = '/cache';
+    const older: SkillMetadata = {
+      name: 'dep', sourcePath: `${root}/bundle/2.3.0/dep/SKILL.md`, folder: root, format: 'claude',
+    };
+    const newer: SkillMetadata = {
+      name: 'dep', sourcePath: `${root}/bundle/2.4.4/dep/SKILL.md`, folder: root, format: 'claude',
+    };
+
+    it('pins a bundle to an exact version (freeze on an older version)', () => {
+      const pinned = new SkillResolver({ bundle: '2.3.0' });
+      expect(pinned.resolve([older, newer], [root])).toBe(older);
+      expect(pinned.resolve([newer, older], [root])).toBe(older);
+    });
+
+    it('latest policy behaves like the default (highest semver)', () => {
+      const r = new SkillResolver({ bundle: 'latest' });
+      expect(r.resolve([older, newer], [root])).toBe(newer);
+    });
+
+    it('a pin matching no candidate is ignored — skill is not lost', () => {
+      const r = new SkillResolver({ bundle: '9.9.9' });
+      expect(r.resolve([older, newer], [root])).toBe(newer);
+    });
+
+    it('a policy for a different bundle does not affect this one', () => {
+      const r = new SkillResolver({ 'other-bundle': '1.0.0' });
+      expect(r.resolve([older, newer], [root])).toBe(newer);
+    });
+  });
 });

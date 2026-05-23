@@ -34,6 +34,21 @@ export function parseVersionFromPath(p: string): ParsedVersion | null {
 }
 
 /**
+ * The bundle name a skill path belongs to: the segment immediately before the
+ * first semver segment (`<root>/<bundle>/<semver>/...`). Returns null when there
+ * is no version segment or nothing precedes it. Used to key version policies.
+ */
+export function parseBundleFromPath(p: string): string | null {
+  const segments = p.split(/[\\/]/).filter((s) => s.length > 0);
+  for (let i = 0; i < segments.length; i++) {
+    if (SEMVER_SEGMENT.test(segments[i]!)) {
+      return i > 0 ? segments[i - 1]! : null;
+    }
+  }
+  return null;
+}
+
+/**
  * Compare two parsed versions. Returns >0 when `a` is newer, <0 when `b` is
  * newer, 0 when equal on major.minor.patch.
  */

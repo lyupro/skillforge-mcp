@@ -157,6 +157,11 @@ export const configSchema = z
     version: z.literal('1.0').default('1.0'),
     folders: z.array(folderEntrySchema).default([]),
     blacklist: z.array(z.string()).default([]),
+    // Per-bundle version policy for recursive roots that hold multiple installed
+    // versions of one bundle. Key = bundle folder name, value = `latest` (default
+    // behaviour: highest semver wins) or an exact `major.minor.patch` to pin. Pin
+    // to the current version to freeze a bundle against newer installs.
+    versionPolicy: z.record(z.string(), z.string()).default({}),
     security: securitySchema.default({}),
     cache: cacheSchema.default({}),
     watcher: watcherSchema.default({}),
