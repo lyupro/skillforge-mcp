@@ -31,6 +31,7 @@ import { main as toolsMain } from './tools.js';
 import { main as foldersMain } from './folders.js';
 import { main as formatsMain } from './formats.js';
 import { main as securityMain } from './security.js';
+import { main as versionPolicyMain } from './version-policy.js';
 import { main as skillsMain } from './skills.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
@@ -64,6 +65,11 @@ Commands:
                (audit-exceptions / audit-target / audit-patterns / blacklist).
                Run "skillforge-mcp security" for area/action usage.
                  Example: skillforge-mcp security blacklist add "wiki-*"
+  version-policy  Pin bundle versions from the terminal (list/set/remove/clear).
+               Default lets the highest semver win; set a strict major.minor.patch
+               to pin a bundle against newer installs.
+               Run "skillforge-mcp version-policy" for sub-action usage.
+                 Example: skillforge-mcp version-policy set engineering-advanced-skills 2.4.4
   skills       View and reload skills from the terminal
                (list/get/reload/reindex). The CLI reads disk, not a live
                server session.
@@ -170,6 +176,9 @@ export async function main(
   }
   if (first === 'security') {
     return securityMain(rawArgv.slice(1));
+  }
+  if (first === 'version-policy') {
+    return versionPolicyMain(rawArgv.slice(1));
   }
   if (first === 'skills') {
     return skillsMain(rawArgv.slice(1));

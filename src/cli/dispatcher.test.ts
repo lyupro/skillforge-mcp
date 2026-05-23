@@ -164,6 +164,20 @@ describe('dispatcher.main', () => {
     });
   });
 
+  describe('version-policy subcommand', () => {
+    it('routes to the version-policy handler and returns its exit code', async () => {
+      const code = await main(['version-policy']);
+      expect(code).toBe(2);
+      expect(errors.join('')).toContain('skillforge version-policy');
+    });
+
+    it('--help lists the version-policy command', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('version-policy');
+    });
+  });
+
   describe('skills subcommand', () => {
     it('routes to the skills handler and returns its exit code', async () => {
       const code = await main(['skills']);
