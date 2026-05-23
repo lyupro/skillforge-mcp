@@ -30,6 +30,7 @@ import { main as installMain } from './install.js';
 import { main as toolsMain } from './tools.js';
 import { main as foldersMain } from './folders.js';
 import { main as formatsMain } from './formats.js';
+import { main as securityMain } from './security.js';
 import { main as skillsMain } from './skills.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
@@ -59,6 +60,10 @@ Commands:
                Lets you support a new LLM's layout without a code change.
                Run "skillforge-mcp formats" for sub-action usage.
                  Example: skillforge-mcp formats add gemini-gem --filename GEMINI.md --derive-name-from-dir
+  security     Manage audit knobs and the skill blacklist from the terminal
+               (audit-exceptions / audit-target / audit-patterns / blacklist).
+               Run "skillforge-mcp security" for area/action usage.
+                 Example: skillforge-mcp security blacklist add "wiki-*"
   skills       View and reload skills from the terminal
                (list/get/reload/reindex). The CLI reads disk, not a live
                server session.
@@ -162,6 +167,9 @@ export async function main(
   }
   if (first === 'formats') {
     return formatsMain(rawArgv.slice(1));
+  }
+  if (first === 'security') {
+    return securityMain(rawArgv.slice(1));
   }
   if (first === 'skills') {
     return skillsMain(rawArgv.slice(1));

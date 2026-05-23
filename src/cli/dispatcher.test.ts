@@ -150,6 +150,20 @@ describe('dispatcher.main', () => {
     });
   });
 
+  describe('security subcommand', () => {
+    it('routes to the security handler and returns its exit code', async () => {
+      const code = await main(['security']);
+      expect(code).toBe(2);
+      expect(errors.join('')).toContain('skillforge security');
+    });
+
+    it('--help lists the security command', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('security');
+    });
+  });
+
   describe('skills subcommand', () => {
     it('routes to the skills handler and returns its exit code', async () => {
       const code = await main(['skills']);
