@@ -87,6 +87,18 @@ git tag -a v1.0.0 -m "SkillForge MCP v1.0.0"
 git push origin v1.0.0
 ```
 
+**Alternative — push commits + tag together, version read from `package.json`** (no hardcoded version, single push):
+
+```bash
+VERSION="v$(node -p "require('./package.json').version")"
+git tag -a "$VERSION" -m "SkillForge MCP $VERSION"   # skip if the tag already exists
+
+# or simply:
+git push --follow-tags        # branch commits + annotated tags, one push
+```
+
+`--follow-tags` pushes the branch plus any annotated tags reachable from the pushed commits, so the commit and its tag land in a single command. Reading `VERSION` from `package.json` keeps the tag in sync with the version stamped in step 1. If the tag already exists (release script, earlier session), drop the tagging lines and run `git push --follow-tags` on its own. It only pushes annotated tags reachable from the pushed commits — both hold for a tag made on the current branch; for lightweight tags or to force every local tag up, use `git push origin <branch> --tags` instead.
+
 On GitHub, create a Release from the tag and paste the body of `RELEASE_NOTES.md`. Attach `lyupro-skillforge-mcp-<version>.tgz` produced by `npm pack` if you want a release artifact bound to the source tag.
 
 ## 7. Marketplace catalog
