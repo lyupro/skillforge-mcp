@@ -122,10 +122,32 @@ describe('folders.main', () => {
       expect(config.folders[0]!.alias).toBe('work');
     });
 
-    it('rejects a non-kebab-case --alias with exit 2', async () => {
-      const code = await main(['add', skillDir, '--alias', 'Bad_Alias'], deps());
+    it('rejects a doubled-separator --alias with exit 2', async () => {
+      const code = await main(['add', skillDir, '--alias', 'foo--bar'], deps());
       expect(code).toBe(2);
       expect(err).toContain('invalid --alias');
+    });
+
+    it('lowercases an uppercase --alias and reports the normalization', async () => {
+      const code = await main(['add', skillDir, '--alias', 'Dammyjay93-Interface'], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('alias normalized "Dammyjay93-Interface" → "dammyjay93-interface"');
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('dammyjay93-interface');
+    });
+
+    it('accepts an underscore --alias and stores it verbatim', async () => {
+      const code = await main(['add', skillDir, '--alias', 'dammyjay93_interface_design'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('dammyjay93_interface_design');
+    });
+
+    it('accepts a slash --alias for source-handle style', async () => {
+      const code = await main(['add', skillDir, '--alias', 'lyupro/llm-skills'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('lyupro/llm-skills');
     });
 
     it('rejects a duplicate alias and leaves config unchanged', async () => {
@@ -219,6 +241,15 @@ describe('folders.main', () => {
       const config = await readConfig();
       expect(config.folders).toHaveLength(0);
     });
+
+    it('matches an alias case-insensitively', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['remove', 'WORK'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders).toHaveLength(0);
+    });
   });
 
   describe('alias', () => {
@@ -246,12 +277,21 @@ describe('folders.main', () => {
       expect(err).toContain('no registered folder matches');
     });
 
-    it('returns exit 2 for a non-kebab-case alias', async () => {
+    it('returns exit 2 for a doubled-separator alias', async () => {
       await main(['add', skillDir], deps());
       err = '';
-      const code = await main(['alias', skillDir, 'Bad_Name'], deps());
+      const code = await main(['alias', skillDir, 'bad--name'], deps());
       expect(code).toBe(2);
       expect(err).toContain('invalid alias');
+    });
+
+    it('normalizes an uppercase alias when setting by path', async () => {
+      await main(['add', skillDir], deps());
+      out = '';
+      const code = await main(['alias', skillDir, 'My-Folder'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('my-folder');
     });
 
     it('returns exit 2 for a duplicate alias', async () => {
@@ -268,6 +308,69 @@ describe('folders.main', () => {
 
     it('returns exit 2 when <name> is missing', async () => {
       const code = await main(['alias', skillDir], deps());
+      expect(code).toBe(2);
+    });
+  });
+
+  describe('rename', () => {
+    it('renames an existing alias addressed by the old alias', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['rename', 'work', 'review'], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('Renamed alias "work" → "review"');
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('review');
+    });
+
+    it('renames an alias addressed by the folder path', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['rename', skillDir, 'review'], deps());
+      expect(code).toBe(0);
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('review');
+    });
+
+    it('normalizes the new alias and reports the change', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      out = '';
+      const code = await main(['rename', 'work', 'Lyupro/LLM-Skills'], deps());
+      expect(code).toBe(0);
+      expect(out).toContain('alias normalized "Lyupro/LLM-Skills" → "lyupro/llm-skills"');
+      const config = await readConfig();
+      expect(config.folders[0]!.alias).toBe('lyupro/llm-skills');
+    });
+
+    it('returns exit 2 for an invalid new alias', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      err = '';
+      const code = await main(['rename', 'work', 'bad--name'], deps());
+      expect(code).toBe(2);
+      expect(err).toContain('invalid alias');
+    });
+
+    it('returns exit 2 for a new alias already in use', async () => {
+      const other = join(tmpRoot, 'skills-rename');
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(other, { recursive: true });
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      await main(['add', other, '--alias', 'review'], deps());
+      err = '';
+      const code = await main(['rename', 'work', 'review'], deps());
+      expect(code).toBe(2);
+      expect(err).toContain('alias already in use');
+    });
+
+    it('returns exit 1 when no folder matches', async () => {
+      const code = await main(['rename', 'ghost', 'review'], deps());
+      expect(code).toBe(1);
+      expect(err).toContain('no registered folder matches');
+    });
+
+    it('returns exit 2 when the new alias is missing', async () => {
+      await main(['add', skillDir, '--alias', 'work'], deps());
+      const code = await main(['rename', 'work'], deps());
       expect(code).toBe(2);
     });
   });

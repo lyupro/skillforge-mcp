@@ -15,7 +15,13 @@ import {
   formatConflictHint,
 } from '../detect/skill-source-conflict.js';
 import { formatFoldersTable } from './folders-format.js';
-import { findFolderEntry, isValidAlias, parseAddFlags } from './folders-shared.js';
+import {
+  ALIAS_HINT,
+  findFolderEntry,
+  isValidAlias,
+  normalizeAlias,
+  parseAddFlags,
+} from './folders-shared.js';
 
 export async function handleList(
   store: ConfigStore,
@@ -75,11 +81,14 @@ export async function handleAdd(
     stderr(`skillforge folders add: invalid or malformed flag\n`);
     return 2;
   }
-  if (flags.alias !== undefined && !isValidAlias(flags.alias)) {
-    stderr(
-      `skillforge folders add: invalid --alias "${flags.alias}" — use kebab-case (e.g. my-folder)\n`,
-    );
-    return 2;
+  // Normalize + validate the alias up front so a malformed value fails fast.
+  let aliasNorm: string | undefined;
+  if (flags.alias !== undefined) {
+    aliasNorm = normalizeAlias(flags.alias);
+    if (!isValidAlias(aliasNorm)) {
+      stderr(`skillforge folders add: invalid --alias "${flags.alias}" — ${ALIAS_HINT}\n`);
+      return 2;
+    }
   }
 
   const absPath = resolve(rawPath);
@@ -94,10 +103,10 @@ export async function handleAdd(
     stdout(`Folder already registered: ${absPath}\n`);
     return 0;
   }
-  if (flags.alias !== undefined) {
-    const aliasTaken = config.folders.some((f) => f.alias === flags.alias);
+  if (aliasNorm !== undefined) {
+    const aliasTaken = config.folders.some((f) => f.alias === aliasNorm);
     if (aliasTaken) {
-      stderr(`skillforge folders add: alias already in use: ${flags.alias}\n`);
+      stderr(`skillforge folders add: alias already in use: ${aliasNorm}\n`);
       return 2;
     }
   }
@@ -106,10 +115,13 @@ export async function handleAdd(
     priority: flags.priority ?? 100,
     enabled: !flags.disabled,
     tags: flags.tags ?? [],
-    ...(flags.alias !== undefined ? { alias: flags.alias } : {}),
+    ...(aliasNorm !== undefined ? { alias: aliasNorm } : {}),
   };
   config.folders.push(entry);
   await store.save(config);
+  if (aliasNorm !== undefined && aliasNorm !== flags.alias) {
+    stdout(`alias normalized "${flags.alias}" → "${aliasNorm}"\n`);
+  }
   stdout(`Registered folder: ${absPath}\n`);
   // Informational only: a conflict does not block the add or change the exit code.
   const conflict = await detectSkillSourceConflict(absPath);
@@ -149,15 +161,14 @@ export async function handleAlias(
   stderr: (t: string) => void,
 ): Promise<number> {
   const token = rest[0];
-  const name = rest[1];
-  if (token === undefined || token.startsWith('--') || name === undefined) {
-    stderr(`skillforge folders alias: usage: folders alias <path> <name>\n`);
+  const rawName = rest[1];
+  if (token === undefined || token.startsWith('--') || rawName === undefined) {
+    stderr(`skillforge folders alias: usage: folders alias <path|alias> <name>\n`);
     return 2;
   }
+  const name = normalizeAlias(rawName);
   if (!isValidAlias(name)) {
-    stderr(
-      `skillforge folders alias: invalid alias "${name}" — use kebab-case (e.g. my-folder)\n`,
-    );
+    stderr(`skillforge folders alias: invalid alias "${rawName}" — ${ALIAS_HINT}\n`);
     return 2;
   }
   const config = await store.load();
@@ -173,7 +184,52 @@ export async function handleAlias(
   }
   entry.alias = name;
   await store.save(config);
+  if (name !== rawName) {
+    stdout(`alias normalized "${rawName}" → "${name}"\n`);
+  }
   stdout(`Set alias "${name}" for folder: ${entry.path}\n`);
+  return 0;
+}
+
+export async function handleRename(
+  store: ConfigStore,
+  rest: string[],
+  stdout: (t: string) => void,
+  stderr: (t: string) => void,
+): Promise<number> {
+  const token = rest[0];
+  const rawNew = rest[1];
+  if (token === undefined || token.startsWith('--') || rawNew === undefined) {
+    stderr(`skillforge folders rename: usage: folders rename <old-alias|path> <new-alias>\n`);
+    return 2;
+  }
+  const newAlias = normalizeAlias(rawNew);
+  if (!isValidAlias(newAlias)) {
+    stderr(`skillforge folders rename: invalid alias "${rawNew}" — ${ALIAS_HINT}\n`);
+    return 2;
+  }
+  const config = await store.load();
+  const entry = findFolderEntry(config.folders, token);
+  if (entry === null) {
+    stderr(`skillforge folders rename: no registered folder matches: ${token}\n`);
+    return 1;
+  }
+  const aliasTaken = config.folders.some((f) => f !== entry && f.alias === newAlias);
+  if (aliasTaken) {
+    stderr(`skillforge folders rename: alias already in use: ${newAlias}\n`);
+    return 2;
+  }
+  const previous = entry.alias;
+  entry.alias = newAlias;
+  await store.save(config);
+  if (newAlias !== rawNew) {
+    stdout(`alias normalized "${rawNew}" → "${newAlias}"\n`);
+  }
+  if (previous !== undefined) {
+    stdout(`Renamed alias "${previous}" → "${newAlias}" for folder: ${entry.path}\n`);
+  } else {
+    stdout(`Set alias "${newAlias}" for folder: ${entry.path}\n`);
+  }
   return 0;
 }
 

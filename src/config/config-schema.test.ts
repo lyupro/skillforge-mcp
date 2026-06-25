@@ -124,15 +124,23 @@ describe('configSchema', () => {
     expect(result.folders[0]!.alias).toBe('my-folder');
   });
 
+  it('accepts underscore and slash separators in a folder alias', () => {
+    for (const ok of ['my_folder', 'lyupro/llm-skills', 'dammyjay93_interface_design']) {
+      const result = configSchema.parse({ folders: [{ path: '/my/skills', alias: ok }] });
+      expect(result.folders[0]!.alias).toBe(ok);
+    }
+  });
+
   it('parses a folder entry without an alias (field is optional)', () => {
     const result = configSchema.parse({ folders: [{ path: '/my/skills' }] });
     expect(result.folders[0]!.alias).toBeUndefined();
   });
 
-  it('rejects non-kebab-case folder aliases', () => {
-    for (const bad of ['My_Folder', 'bad alias', '', 'UPPER', 'trailing-']) {
+  it('rejects malformed folder aliases', () => {
+    const bad = ['My_Folder', 'bad alias', '', 'UPPER', 'trailing-', 'a--b', 'a__b', 'a//b', '/leading'];
+    for (const value of bad) {
       expect(() =>
-        configSchema.parse({ folders: [{ path: '/my/skills', alias: bad }] }),
+        configSchema.parse({ folders: [{ path: '/my/skills', alias: value }] }),
       ).toThrow();
     }
   });

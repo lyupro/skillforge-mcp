@@ -12,13 +12,15 @@
  *   skillforge folders add <path> [flags]          Register a folder
  *   skillforge folders remove <path|alias>         Remove a folder entry
  *   skillforge folders alias <path|alias> <name>   Set/change a folder alias
+ *   skillforge folders rename <old|path> <new>     Rename an existing alias
  *   skillforge folders reset --yes                 Reset folders to default
  *
  * add flags:
  *   --priority <n>     Folder priority (default 100; higher wins on name collisions).
  *   --tags <a,b,c>     Comma-separated tags.
  *   --disabled         Register the folder disabled.
- *   --alias <name>     Short kebab-case alias to address the folder later.
+ *   --alias <name>     Alias to address the folder later (lowercase letters/digits
+ *                      joined by a single - _ or /; uppercase is auto-lowercased).
  *
  * This module keeps only the entry point + action dispatch; the handlers,
  * table formatting, and shared parsing helpers live in sibling modules.
@@ -33,6 +35,7 @@ import {
   handleEnable,
   handleList,
   handleRemove,
+  handleRename,
   handleReset,
 } from './folders-handlers.js';
 import { extractLogFlags } from './log-flags.js';
@@ -55,10 +58,13 @@ Actions:
   list [--json]              Print registered folders (priority, enabled, alias, tags, path).
   add <path> [flags]         Register a folder. Path must exist and be a directory.
                                Flags: --priority <n>, --tags <a,b,c>, --disabled,
-                                      --alias <name> (short kebab-case handle)
+                                      --alias <name> (see alias rules below)
   remove <path|alias>        Remove the entry for <path> or its alias.
   alias <path|alias> <name>  Set or change the alias of a registered folder.
-                               <name> must be kebab-case and unique.
+  rename <old|path> <new>    Rename an existing alias (locate by old alias or path).
+                               Alias: lowercase letters/digits joined by a single
+                               - _ or / (e.g. lyupro/llm-skills); uppercase is
+                               auto-lowercased; no leading/trailing/doubled separators.
   enable <path|alias>        Enable a previously disabled folder.
   disable <path|alias>       Disable a folder without removing it.
   reset --yes                Reset folders to the default (empty) list.
@@ -69,6 +75,7 @@ Examples:
   skillforge folders add ~/.lyupro/skills --priority 50 --tags work,review --alias work
   skillforge folders remove work
   skillforge folders alias ~/.lyupro/skills work
+  skillforge folders rename work lyupro/skills
   skillforge folders disable work
   skillforge folders enable work
   skillforge folders reset --yes
@@ -102,6 +109,8 @@ export async function main(rawArgv: string[], deps: FoldersDeps = {}): Promise<n
         return await handleRemove(store, rest, stdout, stderr);
       case 'alias':
         return await handleAlias(store, rest, stdout, stderr);
+      case 'rename':
+        return await handleRename(store, rest, stdout, stderr);
       case 'enable':
         return await handleEnable(store, rest, stdout, stderr);
       case 'disable':

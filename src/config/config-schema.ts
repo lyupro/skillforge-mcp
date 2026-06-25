@@ -7,11 +7,13 @@ const folderEntrySchema = z
     priority: z.number().int().default(100),
     enabled: z.boolean().default(true),
     tags: z.array(z.string()).default([]),
-    // Optional kebab-case handle to address the folder from the CLI. Optional
-    // so configs written before this field still validate.
+    // Optional handle to address the folder from the CLI: lowercase
+    // letters/digits joined by a single - _ or / (mirrors ALIAS_PATTERN in
+    // folders-shared.ts). Optional so configs written before this field still
+    // validate; kebab-only aliases stored earlier remain valid.
     alias: z
       .string()
-      .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+      .regex(/^[a-z0-9]+([-_/][a-z0-9]+)*$/)
       .optional(),
   })
   .passthrough();

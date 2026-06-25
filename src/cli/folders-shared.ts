@@ -9,10 +9,29 @@ import { resolve } from 'node:path';
 import { stat } from 'node:fs/promises';
 import type { FolderEntry } from '../config/config-schema.js';
 
-/** Kebab-case shape required for a folder alias (lowercase words joined by `-`). */
-export const ALIAS_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+/**
+ * Allowed shape for a folder alias: lowercase letters/digits in segments
+ * joined by a single `-`, `_`, or `/`. The `/` lets aliases mirror a
+ * source handle (`lyupro/llm-skills`); the grammar's single-separator rule
+ * rejects leading/trailing/doubled separators (`--`, `__`, `//`, `-_`, …).
+ */
+export const ALIAS_PATTERN = /^[a-z0-9]+([-_/][a-z0-9]+)*$/;
 
-/** Whether `name` is a valid kebab-case alias token. */
+/** One-line description of the allowed alias shape, reused across error messages. */
+export const ALIAS_HINT =
+  'lowercase letters/digits separated by a single - _ or / ' +
+  '(e.g. lyupro/llm-skills); no leading, trailing, or doubled separators';
+
+/**
+ * Canonicalize a user-supplied alias before validation/storage: trim and
+ * lowercase. Uppercase input is auto-corrected rather than rejected; `_`
+ * and `/` are preserved (they are valid separators, not normalized to `-`).
+ */
+export function normalizeAlias(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+/** Whether `name` matches the allowed alias grammar. Assumes already normalized. */
 export function isValidAlias(name: string): boolean {
   return ALIAS_PATTERN.test(name);
 }
@@ -33,7 +52,9 @@ export async function defaultIsDirectory(p: string): Promise<boolean> {
  * same entry the same way.
  */
 export function findFolderEntry(folders: FolderEntry[], token: string): FolderEntry | null {
-  const byAlias = folders.find((f) => f.alias !== undefined && f.alias === token);
+  // Aliases are stored normalized (lowercase), so match case-insensitively.
+  const aliasToken = token.toLowerCase();
+  const byAlias = folders.find((f) => f.alias !== undefined && f.alias === aliasToken);
   if (byAlias !== undefined) return byAlias;
   const absToken = resolve(token);
   const byPath = folders.find((f) => resolve(f.path) === absToken);
