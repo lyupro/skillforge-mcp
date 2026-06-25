@@ -105,7 +105,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor / Hermes Agent. Flags: `--claude` / `--codex` / `--cursor` / `--hermes` / `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry auto\|npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
 | `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
 | `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
-| `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `enable` / `disable` / `reset`. |
+| `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `rename` / `enable` / `disable` / `reset`. |
 | `formats` | Manage the skill format registry — `list` / `add` / `remove` / `enable` / `disable`. Add support for a new LLM's layout (e.g. Gemini Gem files) without a code release. |
 | `skills` | Inspect the skill registry from the terminal — `list` (with `--search`, `--source`, `--folder`, `--folder-tag`, `--json`, `--folder-fmt`), `get <names>` (comma-separated for a batch fetch), `reload`, `reindex`. `--no-cache` bypasses the on-disk index. |
 | `security` | Manage security knobs from the terminal — `audit-exceptions list\|add\|remove\|clear`, `audit-target [scripts\|all]`, `audit-patterns list`, `blacklist list\|add\|remove\|clear`. |
@@ -131,6 +131,7 @@ skillforge folders list [--json] [--tag <name>]          # print registered fold
 skillforge folders add <path> [flags]                    # register a folder
 skillforge folders remove <path|alias>                    # remove a folder entry
 skillforge folders alias <path|alias> <name>              # set or change a folder alias
+skillforge folders rename <old-alias|path> <new-alias>    # rename an existing alias
 skillforge folders enable <path|alias>                    # re-activate a disabled folder
 skillforge folders disable <path|alias>                   # deactivate a folder (kept in config)
 skillforge folders reset --yes                            # reset folders to the default (empty) list
@@ -139,7 +140,7 @@ skillforge folders reset --yes                            # reset folders to the
 `add` flags:
 
 - `--priority <n>` — folder priority (default `100`; higher wins on name collisions).
-- `--alias <name>` — a short kebab-case handle, unique across folders. Lets `remove` / `enable` / `disable` target the folder without typing the full path.
+- `--alias <name>` — a handle to address the folder without typing its full path (used by `remove` / `enable` / `disable` / `rename`). Lowercase letters/digits in segments joined by a single `-`, `_`, or `/` (e.g. `lyupro/llm-skills`); uppercase is auto-lowercased; doubled or leading/trailing separators are rejected. Unique across folders; matched case-insensitively.
 - `--tags <a,b,c>` — comma-separated tags. Filter on them via `folders list --tag <name>` or the `skills__list` `folderTag` argument.
 - `--disabled` — register the folder disabled.
 

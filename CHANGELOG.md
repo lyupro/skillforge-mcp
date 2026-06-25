@@ -2,6 +2,23 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] — 2026-06-26
+
+Folder aliases now accept the handles real skill folders actually have.
+
+### Added
+
+- **`skillforge folders rename <old-alias|path> <new-alias>`** — rename an existing alias in one step, addressing the folder by its current alias or its path. Same uniqueness and validation rules as `alias`.
+
+### Changed
+
+- **Folder alias grammar relaxed.** An alias is lowercase letters/digits in segments joined by a single `-`, `_`, or `/` (e.g. `lyupro/llm-skills`, `team_shared_skills`). The `/` lets an alias mirror a source handle. Uppercase input is auto-lowercased instead of rejected — `folders add --alias Foo-Bar` stores `foo-bar` and prints the normalization. (Digits were always allowed; the prior error misattributed rejections to them — the real cause was uppercase and `_`.) Doubled or leading/trailing separators (`--`, `__`, `//`, `-foo`, `foo/`) are still rejected.
+- **Alias lookup is case-insensitive.** `remove` / `enable` / `disable` / `alias` / `rename` match a stored alias regardless of the case typed, since aliases are stored normalized.
+
+### Verified
+
+- 880 tests passing + 2 skipped; `tsc --noEmit` clean; all source files ≤ 400 lines.
+
 ## [1.9.0] — 2026-05-24
 
 Full CLI parity for security knobs, manual blacklist patterns, and version-policy pins — all previously requiring hand-edits to `config.json` or the `skills__configure` MCP tool.
