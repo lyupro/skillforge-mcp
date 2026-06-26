@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { main, readPackageVersion, isMainModule } from './dispatcher.js';
+import { main, readPackageVersion, readPackageMeta, isMainModule } from './dispatcher.js';
 
 describe('dispatcher.main', () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
@@ -192,6 +192,26 @@ describe('dispatcher.main', () => {
     });
   });
 
+  describe('update / upgrade subcommand', () => {
+    it('routes update to the update handler (forwards --help, returns 0)', async () => {
+      const code = await main(['update', '--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('skillforge update');
+    });
+
+    it('upgrade is an alias of update', async () => {
+      const code = await main(['upgrade', '--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('skillforge update');
+    });
+
+    it('--help lists the update command', async () => {
+      const code = await main(['--help']);
+      expect(code).toBe(0);
+      expect(writes.join('')).toContain('update');
+    });
+  });
+
   describe('unknown command', () => {
     it('returns exit code 2 and writes error', async () => {
       const code = await main(['weeble']);
@@ -207,6 +227,14 @@ describe('readPackageVersion', () => {
   it('reads version string from package.json', async () => {
     const version = await readPackageVersion();
     expect(version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+});
+
+describe('readPackageMeta', () => {
+  it('reads name + version from package.json', async () => {
+    const meta = await readPackageMeta();
+    expect(meta.name).toBe('@lyupro/skillforge-mcp');
+    expect(meta.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 });
 

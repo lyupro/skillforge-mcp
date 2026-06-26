@@ -33,6 +33,7 @@ import { main as formatsMain } from './formats.js';
 import { main as securityMain } from './security.js';
 import { main as versionPolicyMain } from './version-policy.js';
 import { main as skillsMain } from './skills.js';
+import { main as updateMain } from './update.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
 
@@ -78,6 +79,12 @@ Commands:
                  Example: skillforge-mcp skills get code-review
                  Example: skillforge-mcp skills get code-review,api-design
                  Example: skillforge-mcp skills reindex
+  update       Update the CLI to the latest published npm version. Reads its own
+               package name + version, compares against the registry, and runs
+               npm install -g. Pass --check to only report, --dry-run to print
+               the command, --json for machine output. Alias: upgrade.
+                 Example: skillforge-mcp update --check
+                 Example: skillforge-mcp update
 
 Options:
   --help, -h   Show this message.
@@ -89,7 +96,12 @@ Quick start:
   npx -y @lyupro/skillforge-mcp install --all --dry-run
 `;
 
-export async function readPackageVersion(): Promise<string> {
+/**
+ * Read `name` + `version` from the package's own package.json. The package
+ * name is volatile (registry id) — `skillforge update` reads it here instead
+ * of hard-coding a literal that could silently target the wrong package.
+ */
+export async function readPackageMeta(): Promise<{ name: string; version: string }> {
   const { readFile } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { dirname, resolve } = await import('node:path');
@@ -97,11 +109,18 @@ export async function readPackageVersion(): Promise<string> {
   // dist/cli/dispatcher.js → package.json is two levels up.
   const pkgPath = resolve(here, '..', '..', 'package.json');
   const raw = await readFile(pkgPath, 'utf8');
-  const parsed = JSON.parse(raw) as { version?: unknown };
+  const parsed = JSON.parse(raw) as { name?: unknown; version?: unknown };
   if (typeof parsed.version !== 'string') {
     throw new Error('package.json missing string "version" field');
   }
-  return parsed.version;
+  if (typeof parsed.name !== 'string') {
+    throw new Error('package.json missing string "name" field');
+  }
+  return { name: parsed.name, version: parsed.version };
+}
+
+export async function readPackageVersion(): Promise<string> {
+  return (await readPackageMeta()).version;
 }
 
 /**
@@ -182,6 +201,9 @@ export async function main(
   }
   if (first === 'skills') {
     return skillsMain(rawArgv.slice(1));
+  }
+  if (first === 'update' || first === 'upgrade') {
+    return updateMain(rawArgv.slice(1));
   }
   if (first === 'serve' || first === undefined) {
     const start = overrides.startServe ?? defaultStartServe;
