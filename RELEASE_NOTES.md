@@ -7,6 +7,71 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.11.0 — Self-update from the terminal
+
+**Release date:** 2026-06-26
+
+Updating a global install no longer means hand-typing `npm install -g @lyupro/skillforge-mcp@latest` and remembering when to reach for `sudo`.
+
+- **`skillforge update`** (alias `skillforge upgrade`) — reads its own package name and version from `package.json`, asks the npm registry for `dist-tags.latest`, and compares the two. With no flags it applies a newer version via `npm install -g <name>@latest`.
+- **Report-only modes.** `--check` prints `update available: X → Y` or `up to date` without installing; `--dry-run` prints the install command for pnpm / yarn-global users to copy; `--json` emits `{ current, latest, updateAvailable }`; `--registry <url>` points the check at a private mirror.
+- **Fail-loud, never silent.** A failed install (commonly `EACCES` on a system-owned global prefix) prints the exact command with a `sudo` hint and exits non-zero — nothing is retried behind your back. The package name is read from `package.json`, never hard-coded, since the registry id is volatile.
+
+**Engineering snapshot**
+
+- 901 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
+## v1.10.0 — Folder aliases that match real handles
+
+**Release date:** 2026-06-26
+
+Folder aliases now accept the handles real skill folders actually have.
+
+- **`skillforge folders rename <old-alias|path> <new-alias>`** — rename an existing alias in one step, addressing the folder by its current alias or its path, with the same uniqueness and validation rules as `alias`.
+- **Relaxed alias grammar.** An alias is lowercase letters/digits in segments joined by a single `-`, `_`, or `/` (e.g. `lyupro/llm-skills`, `team_shared_skills`) — the `/` lets an alias mirror a source handle. Uppercase input is auto-lowercased and the normalization is printed, instead of being rejected. (Digits were always allowed; the prior error misattributed rejections to them — the real cause was uppercase and `_`.) Doubled or leading/trailing separators (`--`, `__`, `//`, `-foo`, `foo/`) are still rejected.
+- **Case-insensitive alias lookup.** `remove` / `enable` / `disable` / `alias` / `rename` match a stored alias regardless of the case typed, since aliases are stored normalized.
+
+**Engineering snapshot**
+
+- 880 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
+## v1.9.0 — Full CLI parity for security and version pins
+
+**Release date:** 2026-05-24
+
+Security knobs, manual blacklist patterns, and version-policy pins — all previously requiring hand-edits to `config.json` or the `skills__configure` MCP tool — are now manageable from the shell.
+
+- **`skillforge security` group.** `audit-exceptions list|add|remove|clear`, `audit-target [scripts|all]`, `audit-patterns list` (read-only view of the seeded patterns), and `blacklist list|add|remove|clear` with each entry's classified kind. `list` accepts `--json`, `add` is idempotent, `clear` requires `--yes`, and a reindex hint prints after any mutation.
+- **`skillforge version-policy` group.** `list`, `set <bundle> <latest|major.minor.patch>`, `remove <bundle>`, `clear --yes` — pin a bundle to an exact version or restore highest-semver resolution with `latest`.
+- **Blacklist pattern types.** Entries are auto-classified by syntax: a plain name is an exact match, an entry with `*`/`?` but no `/` is a glob over the skill name (e.g. `wiki-*`), and any entry with `/` is a glob over the source path relative to its registered root (e.g. `**/agenthub/**`). Implemented with a self-contained glob compiler — no new dependency. Existing exact-name entries keep working with no migration.
+
+**Engineering snapshot**
+
+- 867 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
+## v1.8.0 — Security-teaching skills load again
+
+**Release date:** 2026-05-23
+
+Security-teaching skills load again, and the freshest installed version of a bundle wins.
+
+- **`security.auditTarget`** (`scripts` default, or `all`). The auto-audit now scans only fenced executable code blocks (`python`, `sh`, `js`, …) by default rather than the whole document. A skill whose prose merely *mentions* a flagged pattern — a security guide documenting `exec(` or `shell=True` in a table — no longer excludes itself. With `allowScripts:false` such a mention is never executed, so scanning it was a false positive. Set `all` to restore whole-body scanning.
+- **`security.auditExceptions`** — a case-sensitive skill-name allowlist that bypasses the auto-audit for skills whose example code legitimately contains flagged patterns (security auditors, lint rule packs). The manual blacklist still applies.
+- **`versionPolicy`** — a per-bundle map (`<bundle>` → `latest` | `<major.minor.patch>`). Pin a bundle to an exact version, or pin it to its current version to freeze it against newer installs. Defaults to `latest`.
+- **Highest installed version wins on a name collision.** When one recursive root holds two installed versions of a bundle (`…/<bundle>/2.3.0/…` and `…/2.4.4/…`), the resolver keeps the highest semver instead of whichever the filesystem enumerated first. Cross-folder priority still takes precedence; an unparseable version falls back to stable input order.
+
+**Engineering snapshot**
+
+- 811 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines.
+
 ## v1.7.1 — Quieter defaults, candidate-aware skip lines
 
 **Release date:** 2026-05-19
