@@ -192,6 +192,17 @@ skillforge formats disable custom
 
 Built-in formats cannot be removed (the registry would re-add them on the next load). Use `disable` to suppress one.
 
+## Updating the CLI — `skillforge update`
+
+Once installed globally, update in place with `skillforge update` (alias `upgrade`; `--check` reports the latest version without installing). It compares the running version against the npm registry and applies a newer one with `npm install -g`.
+
+Two environment realities are detected up front and surfaced, never auto-resolved:
+
+- **Permissions.** A root-owned global prefix (typical on Linux) needs `sudo`. `update` prints the exact `sudo …` command rather than running it. Avoid `sudo` for good with a user-owned prefix (`npm config set prefix ~/.npm-global`) or a version manager (nvm / fnm / volta).
+- **Cooldown.** npm's `min-release-age` (npm ≥ 11.10.0) can withhold a just-published version; `update` reports it and prints the opt-in `skillforge update --min-release-age 0`.
+
+See [README → Update the CLI](../README.md#update-the-cli--skillforge-update) for the full flag list.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

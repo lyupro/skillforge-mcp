@@ -275,6 +275,13 @@ pnpm smoke
 
 The wiring in Claude Code / Codex / Cursor / Hermes points at the same `dist/cli/dispatcher.js` absolute path — restarting the host session picks up the new build. Once published to npm, the upgrade flow becomes `npm install -g @lyupro/skillforge-mcp@latest` (or the equivalent for the host tool that fetched the package).
 
+### Self-update — `skillforge update`
+
+For a global npm install, `skillforge update` checks the registry and applies a newer version for you (alias `skillforge upgrade`; `--check` reports without installing). Two environment realities it surfaces — and never resolves silently:
+
+- **Permissions.** On Linux the global prefix is usually root-owned (`/usr/lib/node_modules`), so the install needs `sudo`. `update` detects the non-writable prefix and prints the exact `sudo npm install -g @lyupro/skillforge-mcp@latest` — it does not run `sudo` itself. To avoid `sudo` permanently, install into a user-owned prefix (`npm config set prefix ~/.npm-global`, then add `~/.npm-global/bin` to `PATH`) or use a version manager (nvm / fnm / volta).
+- **Cooldown.** If `~/.npmrc` sets npm's `min-release-age` (npm ≥ 11.10.0), a just-published version is withheld until it is old enough. `update` reports this and prints the opt-in `skillforge update --min-release-age 0`. (Same registry filter that hides a fresh version from `npx` below.)
+
 ### Re-wire the host config when upgrading from before v1.4.2 (one-time)
 
 Upgrading the package only refreshes the code. The entry in your host

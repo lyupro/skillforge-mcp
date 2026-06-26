@@ -110,7 +110,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `skills` | Inspect the skill registry from the terminal — `list` (with `--search`, `--source`, `--folder`, `--folder-tag`, `--json`, `--folder-fmt`), `get <names>` (comma-separated for a batch fetch), `reload`, `reindex`. `--no-cache` bypasses the on-disk index. |
 | `security` | Manage security knobs from the terminal — `audit-exceptions list\|add\|remove\|clear`, `audit-target [scripts\|all]`, `audit-patterns list`, `blacklist list\|add\|remove\|clear`. |
 | `version-policy` | Manage per-bundle version pins from the terminal — `list`, `set <bundle> <latest\|x.y.z>`, `remove <bundle>`, `clear`. |
-| `update` | Update the CLI to the latest published npm version. Flags: `--check`, `--dry-run`, `--registry <url>`, `--json`. Alias: `upgrade`. |
+| `update` | Update the CLI to the latest published npm version. Flags: `--check`, `--dry-run`, `--registry <url>`, `--json`, `--min-release-age <n>`. Alias: `upgrade`. |
 | `--version`, `-v` | Print the package version. |
 | `--help`, `-h` | Print combined usage. |
 
@@ -227,17 +227,34 @@ skillforge version-policy list                   # verify the current map
 Check for and apply a newer published version without retyping the install command:
 
 ```bash
-skillforge update             # check, then install if a newer version exists
-skillforge update --check     # only report: "update available: X → Y" or "up to date"
-skillforge update --dry-run   # print the install command without running it
-skillforge update --json      # machine-readable: { current, latest, updateAvailable }
-skillforge upgrade            # alias of update
+skillforge update                    # check, then install if a newer version exists
+skillforge update --check            # only report: "update available: X → Y" or "up to date"
+skillforge update --dry-run          # print the install command without running it
+skillforge update --json             # machine-readable: { current, latest, updateAvailable }
+skillforge update --min-release-age 0 # install a just-published latest despite an npm cooldown
+skillforge upgrade                   # alias of update
 ```
 
-`update` reads its own package name and version from `package.json`, queries the npm registry for the latest published version, and compares the two. When a newer version exists, the default (no flags) applies it with `npm install -g <name>@latest`.
+`update` reads its own package name and version from `package.json`, queries the npm registry for the latest published version, and compares the two. When a newer version exists, the default (no flags) applies it with `npm install -g <name>@latest`. `--check` (and `--json`) double as "what is the latest version on npm?" — they print it without installing.
 
-- **npm assumption.** v1 applies updates through `npm`, the documented install path. pnpm / yarn-global users should run `--dry-run` and copy the printed command. Auto-detecting the global package manager is a future enhancement.
-- **Fail-loud.** If the install fails (commonly an `EACCES` permission error on a system-owned global prefix), the exact command is printed with a `sudo` hint and the process exits non-zero. Nothing is retried silently.
+Before running npm, `update` runs two pre-flight checks and **surfaces** problems rather than papering over them — it never escalates privileges or weakens a policy on your behalf:
+
+- **Permissions (sudo).** If the global prefix is root-owned (common on Linux: `/usr/lib/node_modules`), the install would fail with `EACCES`. `update` detects the non-writable prefix up front, prints the exact `sudo npm install -g <name>@latest`, and exits — it **never runs `sudo` for you**. To avoid `sudo` for good, use a user-owned prefix or a version manager:
+
+  ```bash
+  npm config set prefix ~/.npm-global   # then add ~/.npm-global/bin to PATH
+  # or use nvm / fnm / volta — global installs land in your home dir, no sudo
+  ```
+
+- **Cooldown (`min-release-age`).** npm ≥ 11.10.0 can enforce a supply-chain cooldown (`min-release-age=<days>` in `.npmrc` / `npm config set`) that refuses versions younger than N days. If your configured cooldown would block the latest, `update` reports it and points to the opt-in — it **never bypasses the cooldown silently**:
+
+  ```bash
+  skillforge update --min-release-age 0   # opt in: install the fresh latest now
+  ```
+
+  `--min-release-age <n>` is forwarded straight to npm. (npm rejects combining it with `--before`, so `update` does not expose `--before`.)
+
+- **Fail-loud fallback.** If an install still fails (e.g. an `EACCES` the pre-flight could not predict), the exact command is printed with a `sudo` hint and the process exits non-zero. Nothing is retried silently.
 - **`--registry <url>`** overrides the registry base (default `https://registry.npmjs.org`) for private mirrors.
 
 ## MCP tool surface

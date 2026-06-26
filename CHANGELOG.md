@@ -2,6 +2,21 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] — 2026-06-26
+
+`skillforge update` now warns you about a root-owned prefix or an npm cooldown before npm fails — and never escalates or weakens a policy on your behalf.
+
+### Added
+
+- **Pre-flight permission detection.** Before installing, `update` checks whether the global npm prefix (`npm root -g`) is writable. On a POSIX system where it is not and you are not root, it prints the exact `sudo npm install -g <name>@latest` and exits — it **never runs `sudo` for you**. The message also points to `sudo`-free setups (user-owned prefix / nvm / fnm / volta).
+- **Pre-flight cooldown detection.** `update` reads the publish time of the latest version and your npm `min-release-age` (npm ≥ 11.10.0). If a configured cooldown would block the just-published latest, it reports the gap and prints the opt-in `skillforge update --min-release-age 0` — it **never bypasses the cooldown silently**.
+- **`--min-release-age <n>` flag** (also `--min-release-age=<n>`) — forwarded straight to `npm install`. Pass `0` to install a fresh latest despite a configured cooldown. (npm rejects combining it with `--before`, so `update` does not expose `--before`.)
+- `--check` / `--json` are documented as the "what is the latest version on npm?" query — they print current/latest without installing.
+
+### Verified
+
+- 926 tests passing + 2 skipped; `tsc --noEmit` clean; all source files ≤ 400 lines; `build` + `smoke` green.
+
 ## [1.11.0] — 2026-06-26
 
 Self-update from the terminal — no more retyping the global install command.

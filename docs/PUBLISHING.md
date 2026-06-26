@@ -119,6 +119,8 @@ claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
 
 In a Claude Code session, run `skills__list` to confirm the npm-installed server responds.
 
+> **Cooldown awareness.** Consumers (and CI) that set npm's `min-release-age` (npm ≥ 11.10.0) will not see this version via `npm install -g …@latest` or `npx` until it is old enough. This is expected, not a publish failure — `skillforge update` detects it and prints the `--min-release-age 0` opt-in. Account for the delay when you tell users a release is "live."
+
 ## 9. Rollback
 
 If a critical defect is discovered immediately after publish:

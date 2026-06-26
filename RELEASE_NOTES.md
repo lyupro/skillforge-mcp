@@ -7,6 +7,23 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.12.0 — Update that warns before it fails
+
+**Release date:** 2026-06-26
+
+`skillforge update` now catches the two ways a global self-update goes wrong on real machines — a root-owned prefix and an npm cooldown — and tells you what to do, without ever escalating privileges or weakening a policy on your behalf.
+
+- **Permission pre-flight.** Before installing, `update` checks whether the global npm prefix (`npm root -g`) is writable. On Linux it usually is not (`/usr/lib/node_modules` is root-owned), so the install would die with `EACCES`. `update` now detects that up front, prints the exact `sudo npm install -g <name>@latest`, and exits — it **never runs `sudo` for you**. The message also shows how to drop `sudo` permanently (user-owned prefix `npm config set prefix ~/.npm-global`, or a version manager like nvm / fnm / volta).
+- **Cooldown pre-flight.** npm ≥ 11.10.0 can enforce a supply-chain cooldown (`min-release-age=<days>`) that withholds versions younger than N days. `update` reads the latest version's publish time and your configured cooldown; if the cooldown would block the latest, it reports the gap and prints the opt-in `skillforge update --min-release-age 0`. The cooldown is **never bypassed silently** — it is a protection you set on purpose.
+- **`--min-release-age <n>`** (and `--min-release-age=<n>`) is forwarded straight to npm. Pass `0` to install a just-published latest now. It cannot be combined with npm's `--before`, so `update` deliberately does not expose `--before`.
+- **Latest-version query.** `--check` and `--json` are the way to ask "what is the newest version on npm?" — they print current/latest and never install.
+
+**Engineering snapshot**
+
+- 926 tests passing + 2 skipped.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines (detection helpers split into `update-preflight.ts`).
+
 ## v1.11.0 — Self-update from the terminal
 
 **Release date:** 2026-06-26

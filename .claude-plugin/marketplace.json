@@ -14,7 +14,7 @@
         "package": "@lyupro/skillforge-mcp"
       },
       "description": "Universal Skills MCP server — load Markdown skills from arbitrary folders, lazy-by-design, cross-tool.",
-      "version": "1.11.0",
+      "version": "1.12.0",
       "author": {
         "name": "Lyu Pro",
         "email": "lyupro.dev@gmail.com"
