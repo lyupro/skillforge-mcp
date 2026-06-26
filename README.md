@@ -110,6 +110,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `skills` | Inspect the skill registry from the terminal — `list` (with `--search`, `--source`, `--folder`, `--folder-tag`, `--json`, `--folder-fmt`), `get <names>` (comma-separated for a batch fetch), `reload`, `reindex`. `--no-cache` bypasses the on-disk index. |
 | `security` | Manage security knobs from the terminal — `audit-exceptions list\|add\|remove\|clear`, `audit-target [scripts\|all]`, `audit-patterns list`, `blacklist list\|add\|remove\|clear`. |
 | `version-policy` | Manage per-bundle version pins from the terminal — `list`, `set <bundle> <latest\|x.y.z>`, `remove <bundle>`, `clear`. |
+| `update` | Update the CLI to the latest published npm version. Flags: `--check`, `--dry-run`, `--registry <url>`, `--json`. Alias: `upgrade`. |
 | `--version`, `-v` | Print the package version. |
 | `--help`, `-h` | Print combined usage. |
 
@@ -220,6 +221,24 @@ skillforge version-policy list                   # verify the current map
 ```
 
 `list` accepts `--json`. `clear` requires `--yes`. A reindex hint is printed after any mutation.
+
+### Update the CLI — `skillforge update`
+
+Check for and apply a newer published version without retyping the install command:
+
+```bash
+skillforge update             # check, then install if a newer version exists
+skillforge update --check     # only report: "update available: X → Y" or "up to date"
+skillforge update --dry-run   # print the install command without running it
+skillforge update --json      # machine-readable: { current, latest, updateAvailable }
+skillforge upgrade            # alias of update
+```
+
+`update` reads its own package name and version from `package.json`, queries the npm registry for the latest published version, and compares the two. When a newer version exists, the default (no flags) applies it with `npm install -g <name>@latest`.
+
+- **npm assumption.** v1 applies updates through `npm`, the documented install path. pnpm / yarn-global users should run `--dry-run` and copy the printed command. Auto-detecting the global package manager is a future enhancement.
+- **Fail-loud.** If the install fails (commonly an `EACCES` permission error on a system-owned global prefix), the exact command is printed with a `sudo` hint and the process exits non-zero. Nothing is retried silently.
+- **`--registry <url>`** overrides the registry base (default `https://registry.npmjs.org`) for private mirrors.
 
 ## MCP tool surface
 

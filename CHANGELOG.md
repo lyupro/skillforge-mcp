@@ -2,6 +2,23 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] — 2026-06-26
+
+Self-update from the terminal — no more retyping the global install command.
+
+### Added
+
+- **`skillforge update`** (alias `skillforge upgrade`) — update the CLI to the latest published npm version. Reads its own package name + version from `package.json`, queries the npm registry for `dist-tags.latest`, and compares the two. With no flags it applies a newer version via `npm install -g <name>@latest`.
+  - `--check` — only report (`update available: X → Y` / `up to date`), no install.
+  - `--dry-run` — print the install command without running it (for pnpm / yarn-global users).
+  - `--registry <url>` — override the registry base (default `https://registry.npmjs.org`) for private mirrors.
+  - `--json` — machine-readable `{ current, latest, updateAvailable }`.
+  - A failed install is **fail-loud**: the exact command is printed with a `sudo` hint and the process exits non-zero — nothing is retried silently. The package name is read from `package.json`, never hard-coded, since the registry id is volatile.
+
+### Verified
+
+- 901 tests passing + 2 skipped; `tsc --noEmit` clean; all source files ≤ 400 lines; `build` + `smoke` green.
+
 ## [1.10.0] — 2026-06-26
 
 Folder aliases now accept the handles real skill folders actually have.
