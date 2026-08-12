@@ -7,6 +7,22 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.13.0 — An audit that reads context, not just strings
+
+**Release date:** 2026-08-12
+
+A security-review skill that documents how to *search* for dangerous code — `grep -E "subprocess.*shell=True"` in a bash example, or a Python prompt string mentioning `eval()/exec()` — used to match the audit patterns and exclude itself from the registry. The auto-audit was context-blind: any lexical match anywhere in a fenced executable block blocked the skill.
+
+- **Matches are now classified in context** (default `auditTarget: "scripts"`). Exactly two contexts are *informational* instead of blocking: a quoted argument of a scanner command (`grep`, `egrep`, `fgrep`, `rg`, `ag`, `ack`, `git grep`) inside that command's own pipeline segment, and a closed Python string literal or `#` comment. Informational matches are logged at `debug` level (visible on a verbose reindex) and the skill loads normally.
+- **Everything ambiguous stays blocked.** Python f-strings block — their replacement fields execute (`f"{eval(x)}"` is a real call, not a string). A scanner segment containing `$(…)`, backticks, or `<(…)` is never trusted — the substitution runs code no matter which command it decorates. A single `&` ends a segment, so a background command after `grep` is judged on its own. Unterminated quotes, quoted arguments of non-scanner commands (`python -c "eval(…)"`), and every language without a classifier block exactly as before.
+- **Nothing else moved.** `auditTarget: "all"` keeps the raw whole-body paranoid matching with zero classification. No new config keys, the default `auditPatterns` are unchanged, `auditExceptions` stays empty — no per-skill allowlisting was added to make this work.
+
+**Engineering snapshot**
+
+- 969 tests passing + 2 skipped, including adversarial regressions for f-string interpolation, command/process substitution, background `&`, and unterminated quoting.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes.
+- All source files ≤ 400 lines (classifier isolated in `src/security/audit-context.ts`).
+
 ## v1.12.0 — Update that warns before it fails
 
 **Release date:** 2026-06-26

@@ -2,6 +2,23 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] — 2026-08-12
+
+The auto-audit now understands context: a skill that *documents* dangerous patterns no longer audits itself out of the registry, while real dangerous calls keep blocking.
+
+### Fixed
+
+- **False positive: security-scan examples excluded legitimate skills.** With `auditTarget: "scripts"` (the default), a fenced ```` ```bash ```` block like `git diff --cached | grep -E "subprocess.*shell=True"` or a Python string literal mentioning `eval()/exec()` matched the audit patterns and excluded the whole skill. Matches are now classified in their lexical context.
+
+### Changed
+
+- **Context-aware match classification** (`auditTarget: "scripts"` only). A match is downgraded to *informational* — logged at `debug` level, not blocking — in exactly two cases: (a) inside a quoted argument of a scanner command (`grep`, `egrep`, `fgrep`, `rg`, `ag`, `ack`, `git grep`) within that command's own pipeline segment; (b) inside a closed Python string literal or `#` comment. Everything else blocks as before.
+- **Fail-closed hardening.** Python f-strings always block (replacement fields execute); a scanner segment containing a command/process substitution (`$(…)`, backticks, `<(…)`) is never trusted; a single `&` ends a pipeline segment like `&&`/`|`/`;`; malformed or ambiguous quoting blocks; unknown languages block. `auditTarget: "all"` keeps the raw whole-body matching with no classification. No new config keys; default `auditPatterns` and empty `auditExceptions` untouched.
+
+### Verified
+
+- 969 tests passing + 2 skipped; `tsc --noEmit` clean; all source files ≤ 400 lines; `build` + `smoke` green. Adversarial regressions cover f-string interpolation, `$()`/backtick/`<()` substitution, background `&`, and unterminated quoting.
+
 ## [1.12.0] — 2026-06-26
 
 `skillforge update` now warns you about a root-owned prefix or an npm cooldown before npm fails — and never escalates or weakens a policy on your behalf.
