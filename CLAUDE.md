@@ -12,7 +12,7 @@ Goals: replace per-tool auto-loading of 100+ skills with lazy-by-design MCP disc
 
 **Sibling repo, not nested.** This project sits parallel to the parent project's repo on disk; they share no git history.
 
-**Source of truth for the plan:** stored in the parent project's `!Plans/` directory (centralized planning). Always re-read it before non-trivial changes — design rationale, stages, acceptance criteria live there.
+**Source of truth for the plan:** this repo's `!Plans/` directory (gitignored — local working notes, never pushed). Active ledger: `!Plans/Plan_12_SkillForge_MCP_v2.md`; older history in `!Plans/Archive/`. Always re-read it before non-trivial changes — design rationale, stages, acceptance criteria live there.
 
 ## Stack
 
@@ -94,7 +94,7 @@ Match the change to its trigger and update all listed targets:
 - **New skill format / parser behavior** → [`docs/SKILL_FORMAT.md`](./docs/SKILL_FORMAT.md).
 - **New integration host** → [`docs/INTEGRATION/<host>.md`](./docs/INTEGRATION/); [`docs/INSTALL.md`](./docs/INSTALL.md) + [`docs/INSTALL_CLI.md`](./docs/INSTALL_CLI.md); [`README.md`](./README.md) install section; install logic + tests.
 - **Version bump / release** → all **four** manifests in lockstep — `package.json`, `manifest.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`; `CHANGELOG.md` new section; `RELEASE_NOTES.md` new section (this is the body pasted into the GitHub Release per [`docs/PUBLISHING.md`](./docs/PUBLISHING.md) — never let it fall behind CHANGELOG); annotated tag `vX.Y.Z` on the bump commit; [`docs/PUBLISHING.md`](./docs/PUBLISHING.md) if the process itself changed.
-- **Stage / plan status** → the plan ledger in the parent repo (`!Plans/Plan_12_SkillForge_MCP_v2.md`); commit in that repo separately.
+- **Stage / plan status** → the plan ledger `!Plans/Plan_12_SkillForge_MCP_v2.md` in this repo (gitignored, local-only — no commit needed for it).
 
 After updating, commit the docs together with the code (Definition of Done = code + tests + synced docs + commit).
 
