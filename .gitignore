@@ -43,5 +43,6 @@ desktop.ini
 # OMC artifacts (per-session, not tracked)
 **/.omc/
 
-# Internal planning scratch (plans live in the parent repo ledger)
+# Internal planning scratch and operator checklists (local-only, not published)
 \!Plans/
+\!Docs/
