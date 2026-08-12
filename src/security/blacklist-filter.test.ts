@@ -250,5 +250,84 @@ describe('BlacklistFilter', () => {
         pattern: 'shell=True',
       });
     });
+
+    it('scripts mode allows scanner patterns and Python string mentions with notes', () => {
+      const scanner = new PatternScanner({
+        patterns: ['shell=True', 'eval\\(', 'exec\\(', 'base64\\.b64decode'],
+      });
+      const filter = new BlacklistFilter({ patternScanner: scanner });
+      const body = [
+        '```bash',
+        'git diff --cached | grep -E "os\\.system\\(|subprocess.*shell=True"',
+        '```',
+        '```python',
+        'delegate_task(goal="""Review risky eval()/exec() calls with user input.""")',
+        '```',
+      ].join('\n');
+
+      expect(filter.evaluate(makeContent('context-aware-audit', body))).toEqual({
+        allowed: true,
+        informationalNotes: [
+          { pattern: 'shell=True', reason: 'scanner-command context' },
+          { pattern: 'eval\\(', reason: 'Python string literal' },
+          { pattern: 'exec\\(', reason: 'Python string literal' },
+        ],
+      });
+    });
+
+    it.each([
+      ['shell=True', 'subprocess.run(user_command, shell=True)'],
+      ['eval\\(', 'eval(user_input)'],
+      ['exec\\(', 'exec(untrusted_code)'],
+      ['base64\\.b64decode', 'base64.b64decode(untrusted_payload)'],
+    ])('scripts mode blocks a real Python %s match', (pattern, code) => {
+      const scanner = new PatternScanner({ patterns: [pattern] });
+      const filter = new BlacklistFilter({ patternScanner: scanner });
+      const body = ['```python', code, '```'].join('\n');
+      expect(filter.evaluate(makeContent('unsafe-python', body))).toEqual({
+        allowed: false,
+        reason: 'audit',
+        pattern,
+      });
+    });
+
+    it('allows scanner commands but blocks a quoted Python command', () => {
+      const scanner = new PatternScanner({ patterns: ['eval\\(', 'base64\\.b64decode'] });
+      const filter = new BlacklistFilter({ patternScanner: scanner });
+      const scanners = [
+        '```bash',
+        'rg "eval\\("',
+        'grep "base64.b64decode"',
+        '```',
+      ].join('\n');
+      expect(filter.evaluate(makeContent('shell-scanners', scanners)).allowed).toBe(true);
+
+      const command = ['```bash', 'python -c "eval(input())"', '```'].join('\n');
+      expect(filter.evaluate(makeContent('shell-command', command))).toEqual({
+        allowed: false,
+        reason: 'audit',
+        pattern: 'eval\\(',
+      });
+    });
+
+    it('all mode keeps raw whole-body behavior for the context-safe fixture', () => {
+      const scanner = new PatternScanner({
+        patterns: ['shell=True', 'eval\\(', 'exec\\(', 'base64\\.b64decode'],
+      });
+      const filter = new BlacklistFilter({ patternScanner: scanner, auditTarget: 'all' });
+      const body = [
+        '```bash',
+        'git diff --cached | grep -E "os\\.system\\(|subprocess.*shell=True"',
+        '```',
+        '```python',
+        'message = """Discuss eval()/exec() safely."""',
+        '```',
+      ].join('\n');
+      expect(filter.evaluate(makeContent('paranoid-audit', body))).toEqual({
+        allowed: false,
+        reason: 'audit',
+        pattern: 'shell=True',
+      });
+    });
   });
 });

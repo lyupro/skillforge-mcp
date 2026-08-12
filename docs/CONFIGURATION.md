@@ -111,6 +111,8 @@ The full Zod schema lives in `src/config/config-schema.ts`. Below is the camelCa
   "security": {
     "autoAudit": true,
     "auditPatterns": ["shell=True", "eval\\(", "exec\\(", "base64\\.b64decode"],
+    "auditTarget": "scripts",
+    "auditExceptions": [],
     "allowScripts": false,
     "sandboxScripts": true,
     "sandboxRestrictedPaths": ["~/.ssh", "~/.aws", "~/.gnupg"]
@@ -156,11 +158,28 @@ Array of exact skill names (case-sensitive) to exclude from the registry. Short-
 
 | Field | Default | Effect |
 |-------|---------|--------|
-| `autoAudit` | `true` | When true, `PatternScanner` runs against every skill body on load. Matched skills excluded with a stderr warning. |
+| `autoAudit` | `true` | When true, `PatternScanner` audits each skill on load. Blocking matches exclude the skill with a stderr warning. |
 | `auditPatterns` | `["shell=True", "eval\\(", "exec\\(", "base64\\.b64decode"]` | Regex source strings (compiled with `g` flag). Empty/invalid patterns drop with a stderr note — see [SECURITY.md](./SECURITY.md). |
+| `auditTarget` | `"scripts"` | `scripts` audits fenced executable-language blocks with context classification. `all` scans the raw whole body and treats every match as blocking. |
+| `auditExceptions` | `[]` | Case-sensitive skill names exempt from auto-audit. The manual blacklist still applies. |
 | `allowScripts` | `false` | **Global** gate for `ScriptStrategy`. Both this and per-skill `allowScripts: true` must be true for any script to run. |
 | `sandboxScripts` | `true` | Reserved — currently always-on. `SandboxRunner` is the only `ScriptStrategy` execution path; setting this false has no effect in v1. |
 | `sandboxRestrictedPaths` | `["~/.ssh", "~/.aws", "~/.gnupg"]` | Reserved — informational signal listing paths the env whitelist already prevents subprocess access to. Not enforced at the filesystem level (Node `child_process` cannot). |
+
+In the default `scripts` mode, fenced blocks retain their language tag. For shell-family
+blocks, a pattern is informational only when it is wholly inside a quoted argument to
+`grep`, `egrep`, `fgrep`, `rg`, `ag`, `ack`, or `git grep` in that command's own pipeline
+segment. For Python-family blocks, a pattern wholly inside a closed string literal or
+`#` comment is informational. Informational notes appear at `debug` level and do not
+exclude the skill when every match is informational.
+
+Classification is fail-closed: malformed or ambiguous quoting, real Python calls,
+quoted arguments to non-scanner shell commands, and matches in other languages remain
+blocking. Python f-strings stay blocking (replacement fields execute), and a scanner
+segment containing a command or process substitution (`$(…)`, backticks, `<(…)`) is
+never trusted; `&`, `&&`, `||`, `|`, `;` and newlines all end a segment. `auditTarget:
+"all"` bypasses classification and preserves raw whole-body matching for operators who
+want the stricter behavior.
 
 ### `cache`
 

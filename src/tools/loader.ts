@@ -146,6 +146,12 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
         deps.logger.warn(`[skillforge] excluded "${meta.name}" from ${filePath} — ${detail}`);
         continue;
       }
+      for (const note of verdict.informationalNotes ?? []) {
+        deps.logger.debug(
+          `[skillforge] audit note (informational): "${note.pattern}" in ${note.reason} ` +
+            `— not blocking "${meta.name}"`,
+        );
+      }
 
       const existing = candidates.get(meta.name) ?? [];
       existing.push(meta);

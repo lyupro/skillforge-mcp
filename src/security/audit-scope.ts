@@ -8,8 +8,8 @@
  * mention is never executed, so scanning prose is wrong.
  *
  * `auditTarget: "scripts"` (the default) narrows the scan to fenced code blocks
- * whose info string names an executable language. `auditTarget: "all"` keeps the
- * whole-body behaviour.
+ * whose info string names an executable language. Language tags remain attached
+ * so the audit can classify matches in their lexical context.
  */
 
 /** Info-string languages treated as executable code worth auditing. */
@@ -37,20 +37,25 @@ const EXECUTABLE_LANGS = new Set([
 /** Opening fence: ``` or ~~~ (>=3), optional leading whitespace, optional info string. */
 const FENCE_RE = /^[ \t]*(`{3,}|~{3,})[ \t]*([^\n`]*)$/;
 
+export interface ExecutableCodeBlock {
+  lang: string;
+  text: string;
+}
+
 /**
- * Return the concatenation of every fenced code block in `body` whose language
- * tag is an executable language. Non-executable blocks (md, json, yaml, text,
- * untagged) and all prose are dropped. Fence char and length must match to close
- * a block, mirroring CommonMark.
+ * Return every fenced executable block with its normalized language tag.
+ * Non-executable blocks (md, json, yaml, text, untagged) and prose are dropped.
+ * Fence char and length must match to close a block, mirroring CommonMark.
  */
-export function extractExecutableCode(body: string): string {
+export function extractExecutableCode(body: string): ExecutableCodeBlock[] {
   const lines = body.split('\n');
-  const out: string[] = [];
+  const blocks: ExecutableCodeBlock[] = [];
 
   let inBlock = false;
   let fenceChar = '';
   let fenceLen = 0;
-  let executable = false;
+  let current: ExecutableCodeBlock | null = null;
+  let currentLineCount = 0;
 
   for (const line of lines) {
     if (!inBlock) {
@@ -60,25 +65,27 @@ export function extractExecutableCode(body: string): string {
       fenceChar = m[1]![0]!;
       fenceLen = m[1]!.length;
       const lang = m[2]!.trim().split(/[ \t]/)[0]!.toLowerCase();
-      executable = EXECUTABLE_LANGS.has(lang);
+      current = EXECUTABLE_LANGS.has(lang) ? { lang, text: '' } : null;
+      currentLineCount = 0;
       continue;
     }
 
     // Inside a block: a closing fence is the same char, length >= opening, no info string.
     const closeRe = new RegExp(`^[ \\t]*(${fenceChar === '`' ? '`' : '~'}{${fenceLen},})[ \\t]*$`);
     if (closeRe.test(line)) {
+      if (current !== null) blocks.push(current);
       inBlock = false;
-      executable = false;
+      current = null;
+      currentLineCount = 0;
       continue;
     }
 
-    if (executable) out.push(line);
+    if (current !== null) {
+      current.text += currentLineCount === 0 ? line : `\n${line}`;
+      currentLineCount++;
+    }
   }
 
-  return out.join('\n');
-}
-
-/** Pick what the auto-audit should scan for a given body + target mode. */
-export function auditScopeText(body: string, target: 'scripts' | 'all'): string {
-  return target === 'all' ? body : extractExecutableCode(body);
+  if (current !== null) blocks.push(current);
+  return blocks;
 }

@@ -1,6 +1,7 @@
 import { relative } from 'node:path';
 import type { PatternScanner } from './pattern-scanner.js';
-import { auditScopeText } from './audit-scope.js';
+import { extractExecutableCode } from './audit-scope.js';
+import { classifyAuditMatch, type InformationalReason } from './audit-context.js';
 import {
   compileBlacklist,
   matchBlacklist,
@@ -24,8 +25,13 @@ export interface BlacklistFilterOptions {
   auditTarget?: 'scripts' | 'all';
 }
 
+export interface InformationalAuditNote {
+  pattern: string;
+  reason: InformationalReason;
+}
+
 export type FilterVerdict =
-  | { allowed: true }
+  | { allowed: true; informationalNotes?: InformationalAuditNote[] }
   | { allowed: false; reason: 'manual'; pattern: string }
   | { allowed: false; reason: 'audit'; pattern: string };
 
@@ -73,10 +79,27 @@ export class BlacklistFilter {
     }
 
     if (this.#scanner !== null && !this.#auditExceptions.has(content.name)) {
-      const target = auditScopeText(content.body, this.#auditTarget);
-      const result = this.#scanner.scan(target);
-      if (!result.safe) {
-        return { allowed: false, reason: 'audit', pattern: result.matches[0]!.pattern };
+      if (this.#auditTarget === 'all') {
+        const result = this.#scanner.scan(content.body);
+        if (!result.safe) {
+          return { allowed: false, reason: 'audit', pattern: result.matches[0]!.pattern };
+        }
+      } else {
+        const informationalNotes: InformationalAuditNote[] = [];
+        for (const block of extractExecutableCode(content.body)) {
+          const result = this.#scanner.scan(block.text);
+          for (const match of result.matches) {
+            const classification = classifyAuditMatch(block, match);
+            if (classification.blocking) {
+              return { allowed: false, reason: 'audit', pattern: match.pattern };
+            }
+            informationalNotes.push({
+              pattern: match.pattern,
+              reason: classification.reason,
+            });
+          }
+        }
+        if (informationalNotes.length > 0) return { allowed: true, informationalNotes };
       }
     }
 
