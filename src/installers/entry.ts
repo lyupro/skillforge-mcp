@@ -6,7 +6,7 @@
  *
  *  - 'bin'   — command=skillforge-mcp, args=['serve']. Avoids a wrapper and
  *              survives global package upgrades, but only when the command
- *              runs without a shell and reports this package's exact version.
+ *              resolves on PATH and reports this package's exact version.
  *  - 'npx'   — command=npx, args=['-y', <pkg>, 'serve']. Resolves the package
  *              from the registry on every server spawn; needed only for a
  *              one-shot `npx … install` run with nothing installed on disk.
@@ -16,8 +16,9 @@
  */
 
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { posix, resolve, win32 } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { InstallOptions } from './types.js';
 
@@ -44,6 +45,19 @@ export interface EntryResolutionDeps {
   probeBin?: () => BinProbeResult;
   packageVersion?: string;
   moduleUrl?: string;
+}
+
+export interface CommandResolverDeps {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  isFile?: (candidate: string) => boolean;
+}
+
+export interface BinProbeDeps {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  resolveCommand?: (name: string) => string | undefined;
+  spawn?: typeof spawnSync;
 }
 
 /** A host MCP server config entry — the { command, args } pair to spawn. */
@@ -117,17 +131,61 @@ function installedPackageVersion(): string {
  */
 const PROBE_TIMEOUT_MS = 5_000;
 
-export function probeBinVersion(spawnFn: typeof spawnSync = spawnSync): BinProbeResult {
-  const result = spawnFn(BIN_COMMAND, ['--version'], {
+function pathValue(env: NodeJS.ProcessEnv): string {
+  const key = Object.keys(env).find((entry) => entry.toLowerCase() === 'path');
+  return key === undefined ? '' : (env[key] ?? '');
+}
+
+export function resolveCommandOnPath(
+  name: string = BIN_COMMAND,
+  deps: CommandResolverDeps = {},
+): string | undefined {
+  const env = deps.env ?? process.env;
+  const platform = deps.platform ?? process.platform;
+  const pathApi = platform === 'win32' ? win32 : posix;
+  const separator = platform === 'win32' ? ';' : ':';
+  const extensions = platform === 'win32'
+    ? (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
+    : [''];
+  const isFile = deps.isFile ?? ((candidate: string) => {
+    try {
+      return statSync(candidate).isFile();
+    } catch {
+      return false;
+    }
+  });
+
+  for (const directory of pathValue(env).split(separator).filter(Boolean)) {
+    for (const extension of extensions) {
+      const candidate = pathApi.join(directory, `${name}${extension}`);
+      if (isFile(candidate)) return candidate;
+    }
+  }
+  return undefined;
+}
+
+export function probeBinVersion(deps: BinProbeDeps = {}): BinProbeResult {
+  const platform = deps.platform ?? process.platform;
+  const env = deps.env ?? process.env;
+  const command = (deps.resolveCommand ?? ((name) => resolveCommandOnPath(name, {
+    env,
+    platform,
+  })))(BIN_COMMAND);
+  if (command === undefined) {
+    return { ok: false, reason: `${BIN_COMMAND} was not found on PATH` };
+  }
+  const shell = platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+  const result = (deps.spawn ?? spawnSync)(command, ['--version'], {
     encoding: 'utf8',
-    shell: false,
+    env,
+    shell,
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: PROBE_TIMEOUT_MS,
   });
   if (result.error !== undefined) {
     return {
       ok: false,
-      reason: `${BIN_COMMAND} could not be spawned without a shell: ${result.error.message}`,
+      reason: `${command} could not be probed: ${result.error.message}`,
     };
   }
   if (result.status !== 0) {
@@ -136,13 +194,13 @@ export function probeBinVersion(spawnFn: typeof spawnSync = spawnSync): BinProbe
       reason: `${BIN_COMMAND} --version exited with status ${String(result.status)}`,
     };
   }
-  return { ok: true, version: result.stdout.trim() };
+  return { ok: true, version: String(result.stdout ?? '').trim() };
 }
 
 function verifiedBinFailure(deps: EntryResolutionDeps): string | undefined {
   const expected = deps.packageVersion ?? installedPackageVersion();
   const probe = (deps.probeBin ?? probeBinVersion)();
-  if (!probe.ok) return probe.reason ?? `${BIN_COMMAND} is not runnable without a shell`;
+  if (!probe.ok) return probe.reason ?? `${BIN_COMMAND} could not be verified`;
   if (probe.version !== expected) {
     return `${BIN_COMMAND} --version reported ${JSON.stringify(probe.version ?? '')}; expected ${JSON.stringify(expected)}`;
   }

@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.9.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, terminal `tools` + `folders` + `formats` + `skills` + `security` + `version-policy` subcommands, blacklist name-glob and path-glob patterns, config-driven skill format registry with directory-name derivation, code-scoped security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 867 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.14.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, a server that exits when its client goes away (transport close / signals / dead parent), verified host entries that prefer a command over a path, terminal `tools` + `folders` + `formats` + `skills` + `security` + `version-policy` subcommands, blacklist name-glob and path-glob patterns, config-driven skill format registry with directory-name derivation, context-aware security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 1003 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -32,7 +32,7 @@ npm install -g @lyupro/skillforge-mcp
 skillforge install --all
 ```
 
-Auto-detects Claude Code, Codex CLI, Cursor, and Hermes Agent on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`.
+Auto-detects Claude Code, Codex CLI, Cursor, and Hermes Agent on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`. Dry runs show only the `skillforge` entry by default; `--show-full-config` explicitly dumps complete host configs and may expose unrelated secrets.
 
 **Install globally first, then run the installer from that install.** The entry it writes into each host config depends on where the installer itself lives:
 
@@ -43,7 +43,7 @@ Auto-detects Claude Code, Codex CLI, Cursor, and Hermes Agent on your machine an
 
 A one-shot `npx` run cannot write a path to itself — its files live in a temp directory that will be gone tomorrow — so it writes the `npx` form. That form works, but each session then costs two processes instead of one. The global route is the recommended one.
 
-The short-command form is only written after the installer actually spawns `skillforge-mcp --version` the same way a host would (no shell) and gets back this exact package version. Anything else falls back to an absolute path to `dist/cli/dispatcher.js` and prints why.
+The short-command form is only written after the installer resolves `skillforge-mcp` on `PATH` (including Windows `PATHEXT` shims), probes that concrete path, and gets back this exact package version. Windows `.cmd`/`.bat` shims use a shell for this trusted resolved path; POSIX binaries do not. Anything else falls back to an absolute path to `dist/cli/dispatcher.js` and prints why.
 
 By default the installer edits each host's global config. Pass `--scope project` to wire SkillForge into a repo-local config rooted at the current directory instead — `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor), `.hermes/config.yaml` (Hermes Agent):
 
@@ -117,7 +117,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | Command | Purpose |
 |---------|---------|
 | `serve` | Run the stdio MCP server. Default when no command is given. |
-| `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor / Hermes Agent. Flags: `--claude` / `--codex` / `--cursor` / `--hermes` / `--all`, `--dry-run`, `--uninstall`, `--force`, `--entry auto\|npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
+| `install` | Wire SkillForge into Claude Code / Codex CLI / Cursor / Hermes Agent. Flags: `--claude` / `--codex` / `--cursor` / `--hermes` / `--all`, `--dry-run`, `--show-full-config`, `--uninstall`, `--force`, `--entry auto\|bin\|npx\|local`, `--binary-path <path>`, `--scope global\|project`. |
 | `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
 | `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
 | `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `rename` / `enable` / `disable` / `reset`. |

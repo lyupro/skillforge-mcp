@@ -84,9 +84,10 @@ describe('parseArgs', () => {
   });
 
   it('parses --all and modes', () => {
-    const args = parseArgs(['--all', '--dry-run', '--force']);
+    const args = parseArgs(['--all', '--dry-run', '--show-full-config', '--force']);
     expect(args.all).toBe(true);
     expect(args.dryRun).toBe(true);
+    expect(args.showFullConfig).toBe(true);
     expect(args.force).toBe(true);
   });
 
@@ -280,6 +281,55 @@ describe('runInstall dispatch', () => {
     expect(claude.previewCalls).toBe(1);
     expect(claude.installCalls).toBe(0);
     expect(cap.out.join('\n')).toContain('DRY RUN');
+  });
+
+  it('default --dry-run prints only the skillforge entry and never a neighboring secret', async () => {
+    const claude = makeFakeInstaller('claude');
+    claude.preview = async () => ({
+      tool: 'claude', configPath: '/fake/claude', willCreate: false, action: 'install',
+      before: JSON.stringify({ mcpServers: {
+        other: { command: 'foreign', env: { API_KEY: 'neighbor-secret-value' } },
+      } }),
+      after: JSON.stringify({ mcpServers: {
+        other: { command: 'foreign', env: { API_KEY: 'neighbor-secret-value' } },
+        skillforge: { command: 'skillforge-mcp', args: ['serve'] },
+      } }),
+    });
+    const cap = makeCapture();
+    await runInstall(parseArgs(['--claude', '--dry-run']), {
+      installers: [claude], stdout: cap.stdout, stderr: cap.stderr,
+    });
+    const output = cap.out.join('\n');
+    expect(output).toContain('skillforge-mcp');
+    expect(output).not.toContain('neighbor-secret-value');
+    expect(output).toContain('Other host configuration entries are preserved');
+  });
+
+  it('--show-full-config prints the complete dry-run dump with an explicit warning', async () => {
+    const claude = makeFakeInstaller('claude');
+    claude.preview = async () => ({
+      tool: 'claude', configPath: '/fake/claude', willCreate: false, action: 'install',
+      before: '{"secret":"neighbor-secret-value"}',
+      after: '{"secret":"neighbor-secret-value","mcpServers":{"skillforge":{"command":"npx"}}}',
+    });
+    const cap = makeCapture();
+    await runInstall(parseArgs(['--claude', '--dry-run', '--show-full-config']), {
+      installers: [claude], stdout: cap.stdout, stderr: cap.stderr,
+    });
+    const output = cap.out.join('\n');
+    expect(output).toContain('neighbor-secret-value');
+    expect(output).toContain('WARNING: full host config dump may expose secrets');
+  });
+
+  it('default --dry-run reports a missing file through the willCreate branch', async () => {
+    const claude = makeFakeInstaller('claude');
+    const cap = makeCapture();
+    await runInstall(parseArgs(['--claude', '--dry-run']), {
+      installers: [claude], stdout: cap.stdout, stderr: cap.stderr,
+    });
+    const output = cap.out.join('\n');
+    expect(output).toContain('willCreate=true');
+    expect(output).toContain('(file does not exist)');
   });
 
   it('--uninstall routes to uninstall(), not install()', async () => {

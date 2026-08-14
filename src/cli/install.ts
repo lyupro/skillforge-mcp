@@ -16,6 +16,8 @@
  */
 
 import { getAllInstallers, getInstallerByName } from '../installers/registry.js';
+import * as TOML from '@iarna/toml';
+import { parse as parseYaml } from 'yaml';
 import type { Scope } from '../installers/paths.js';
 import type {
   Installer,
@@ -32,6 +34,7 @@ export interface ParsedArgs {
   hermes: boolean;
   all: boolean;
   dryRun: boolean;
+  showFullConfig: boolean;
   uninstall: boolean;
   force: boolean;
   entry: 'bin' | 'npx' | 'local' | 'auto';
@@ -61,6 +64,7 @@ Targets (at least one required, unless --help):
 
 Modes:
   --dry-run           Print intended edits, do not touch disk
+  --show-full-config  With --dry-run, dump entire host configs; WARNING: may expose secrets
   --uninstall         Reverse a previous install
   --force             Overwrite an existing SkillForge entry
 
@@ -97,6 +101,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     hermes: false,
     all: false,
     dryRun: false,
+    showFullConfig: false,
     uninstall: false,
     force: false,
     entry: 'auto',
@@ -124,6 +129,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--dry-run':
         out.dryRun = true;
+        break;
+      case '--show-full-config':
+        out.showFullConfig = true;
         break;
       case '--uninstall':
         out.uninstall = true;
@@ -211,13 +219,40 @@ function formatUninstall(r: UninstallResult): string {
   return `[${r.tool}] ${tag} ${r.configPath}${msg}`;
 }
 
-function formatPreview(r: PreviewResult): string {
+function previewEntry(r: PreviewResult, content: string | null): string {
+  if (content === null) return '(file does not exist)';
+  let config: unknown;
+  if (r.tool === 'codex') config = TOML.parse(content);
+  else if (r.tool === 'hermes') config = parseYaml(content);
+  else config = JSON.parse(content);
+  if (config === null || typeof config !== 'object') return '(not present)';
+  const root = config as Record<string, unknown>;
+  const servers = (r.tool === 'claude' || r.tool === 'cursor')
+    ? root.mcpServers
+    : root.mcp_servers;
+  if (servers === null || typeof servers !== 'object') return '(not present)';
+  const entry = (servers as Record<string, unknown>).skillforge;
+  return entry === undefined ? '(not present)' : JSON.stringify(entry, null, 2);
+}
+
+function formatPreview(r: PreviewResult, showFullConfig: boolean): string {
+  if (showFullConfig) {
+    return [
+      `--- DRY RUN [${r.tool}] action=${r.action} configPath=${r.configPath} willCreate=${r.willCreate}`,
+      `WARNING: full host config dump may expose secrets from other entries.`,
+      `--- before:`,
+      r.before ?? '(file does not exist)',
+      `--- after:`,
+      r.after,
+    ].join('\n');
+  }
   const lines = [
     `--- DRY RUN [${r.tool}] action=${r.action} configPath=${r.configPath} willCreate=${r.willCreate}`,
-    `--- before:`,
-    r.before ?? '(file does not exist)',
-    `--- after:`,
-    r.after,
+    `--- skillforge before:`,
+    previewEntry(r, r.before),
+    `--- skillforge after:`,
+    previewEntry(r, r.after),
+    `Other host configuration entries are preserved and omitted from this preview.`,
   ];
   return lines.join('\n');
 }
@@ -277,7 +312,7 @@ export async function runInstall(args: ParsedArgs, deps: RunDeps = {}): Promise<
     try {
       if (args.dryRun) {
         const preview = await inst.preview({ ...opts, action: args.uninstall ? 'uninstall' : 'install' });
-        stdout(formatPreview(preview));
+        stdout(formatPreview(preview, args.showFullConfig));
       } else if (args.uninstall) {
         const result = await inst.uninstall();
         stdout(formatUninstall(result));

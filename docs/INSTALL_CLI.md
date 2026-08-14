@@ -19,11 +19,12 @@ npx @lyupro/skillforge-mcp install [flags]
 | `--cursor` | Edit `~/.cursor/mcp.json` |
 | `--hermes` | Edit `~/.hermes/config.yaml` (or `$HERMES_HOME/config.yaml`) |
 | `--all` | Auto-detect installed hosts (binary on PATH or config file present) and install into every detected one |
-| `--dry-run` | Print the exact `before` and `after` content per host. No disk writes. |
+| `--dry-run` | Print only the `skillforge` entry before and after. Other host entries are preserved but omitted, so neighboring secrets are not exposed. No disk writes. |
+| `--show-full-config` | With `--dry-run`, print complete host configs before and after. **Warning:** this may expose API keys and other secrets from unrelated entries. |
 | `--uninstall` | Reverse a previous install — remove the `skillforge` entry, leave everything else untouched |
 | `--force` | Overwrite an existing `skillforge` entry (default is to refuse with `already-installed`) |
 | `--entry auto` | Default. First tries the verified bin form. If that check fails, a stable install writes the direct `node` path and a one-shot `npx … install` run uses the `npx` form. The install output explains why it fell back. |
-| `--entry bin` | Requires `{ command: "skillforge-mcp", args: ["serve"] }`. The command must run without a shell and report the exact version being installed; otherwise installation fails. |
+| `--entry bin` | Requires `{ command: "skillforge-mcp", args: ["serve"] }`. The command must resolve on `PATH` and report the exact version being installed; otherwise installation fails. |
 | `--entry npx` | Explicit override. Writes `{ command: "npx", args: ["-y", "@lyupro/skillforge-mcp", "serve"] }` |
 | `--entry local` | Explicit override. Writes `{ command: "node", args: ["<binary-path>", "serve"] }` |
 | `--binary-path PATH` | Override the local-entry binary path (defaults to `<package>/dist/cli/dispatcher.js`) |
@@ -31,11 +32,12 @@ npx @lyupro/skillforge-mcp install [flags]
 
 At least one of `--claude`, `--codex`, `--cursor`, `--hermes`, or `--all` is required.
 
-The `auto` probe runs `skillforge-mcp --version` exactly as an MCP host will:
-without a shell. The short form is used only when that process exits successfully
-and its output exactly matches this package's version. A missing command, a
-Windows shim that only works through a shell, or a stale global version causes a
-reported fallback to the existing stable-path / ephemeral-`npx` behavior. Use
+The `auto` probe resolves `skillforge-mcp` on `PATH` (including `PATHEXT` shims on
+Windows), then runs the concrete path. Windows `.cmd` and `.bat` shims are run
+through a shell; POSIX binaries are not. The short form is used only when that
+process exits successfully and its output exactly matches this package's version.
+A missing command, failed probe, or stale global version causes a reported fallback
+to the existing stable-path / ephemeral-`npx` behavior. Use
 `--entry bin` when fallback is unacceptable; that explicit mode exits non-zero
 instead of silently changing the requested entry shape.
 
@@ -53,6 +55,9 @@ npx @lyupro/skillforge-mcp install --all
 
 # See what would happen without touching disk
 npx @lyupro/skillforge-mcp install --all --dry-run
+
+# Explicitly inspect complete configs (may expose unrelated secrets)
+npx @lyupro/skillforge-mcp install --all --dry-run --show-full-config
 
 # Use a local build instead of the published npm package
 npx @lyupro/skillforge-mcp install --all --entry local --binary-path /abs/skillforge-mcp/dist/cli/dispatcher.js

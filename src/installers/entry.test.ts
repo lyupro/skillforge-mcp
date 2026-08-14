@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { pathToFileURL } from 'node:url';
 import type { spawnSync } from 'node:child_process';
 import {
@@ -13,6 +13,7 @@ import {
   buildEntry,
   resolveEntry,
   probeBinVersion,
+  resolveCommandOnPath,
 } from './entry.js';
 
 describe('npxEntry / localEntry', () => {
@@ -91,7 +92,7 @@ describe('buildEntry', () => {
     })).toEqual({ command: 'skillforge-mcp', args: ['serve'] });
   });
 
-  it('entry=bin fails loudly when the command cannot be spawned without a shell', () => {
+  it('entry=bin fails loudly when the command cannot be verified', () => {
     expect(() => buildEntry({ entry: 'bin' }, '/fallback.js', {
       packageVersion: '1.13.0',
       probeBin: () => ({ ok: false, reason: 'not spawnable without a shell' }),
@@ -177,7 +178,11 @@ describe('probeBinVersion', () => {
       return { error: Object.assign(new Error('spawnSync ETIMEDOUT'), { code: 'ETIMEDOUT' }) };
     }) as unknown as typeof spawnSync;
 
-    const result = probeBinVersion(spawnFn);
+    const result = probeBinVersion({
+      platform: 'linux',
+      resolveCommand: () => '/usr/bin/skillforge-mcp',
+      spawn: spawnFn,
+    });
 
     expect(seen?.shell).toBe(false);
     expect(seen?.stdio).toEqual(['ignore', 'pipe', 'pipe']);
@@ -188,6 +193,68 @@ describe('probeBinVersion', () => {
 
   it('reports the trimmed version when the bin answers', () => {
     const spawnFn = (() => ({ status: 0, stdout: '1.14.0\n' })) as unknown as typeof spawnSync;
-    expect(probeBinVersion(spawnFn)).toEqual({ ok: true, version: '1.14.0' });
+    expect(probeBinVersion({
+      resolveCommand: () => '/usr/bin/skillforge-mcp',
+      spawn: spawnFn,
+    })).toEqual({ ok: true, version: '1.14.0' });
+  });
+
+  it('probes a resolved Windows cmd shim through a shell', () => {
+    let seenCommand: string | undefined;
+    let seenOptions: Record<string, unknown> | undefined;
+    const spawnFn = ((command: string, _args: string[], opts: Record<string, unknown>) => {
+      seenCommand = command;
+      seenOptions = opts;
+      return { status: 0, stdout: '1.14.0' };
+    }) as unknown as typeof spawnSync;
+
+    expect(probeBinVersion({
+      platform: 'win32',
+      resolveCommand: () => 'C:\\npm\\skillforge-mcp.cmd',
+      spawn: spawnFn,
+    }).ok).toBe(true);
+    expect(seenCommand).toBe('C:\\npm\\skillforge-mcp.cmd');
+    expect(seenOptions?.shell).toBe(true);
+  });
+
+  it('probes a resolved POSIX binary without a shell', () => {
+    let shell: unknown;
+    const spawnFn = ((_command: string, _args: string[], opts: Record<string, unknown>) => {
+      shell = opts.shell;
+      return { status: 0, stdout: '1.14.0' };
+    }) as unknown as typeof spawnSync;
+    probeBinVersion({
+      platform: 'linux',
+      resolveCommand: () => '/opt/bin/skillforge-mcp',
+      spawn: spawnFn,
+    });
+    expect(shell).toBe(false);
+  });
+
+  it('falls back without spawning when the command is absent from PATH', () => {
+    const spawnFn = vi.fn();
+    expect(probeBinVersion({
+      resolveCommand: () => undefined,
+      spawn: spawnFn as unknown as typeof spawnSync,
+    })).toEqual({ ok: false, reason: 'skillforge-mcp was not found on PATH' });
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveCommandOnPath', () => {
+  it('finds a Windows shim using PATHEXT and returns its concrete path', () => {
+    expect(resolveCommandOnPath(BIN_COMMAND, {
+      platform: 'win32',
+      env: { Path: 'C:\\first;C:\\npm', PATHEXT: '.EXE;.CMD' },
+      isFile: (candidate) => candidate === 'C:\\npm\\skillforge-mcp.CMD',
+    })).toBe('C:\\npm\\skillforge-mcp.CMD');
+  });
+
+  it('finds an extensionless POSIX executable', () => {
+    expect(resolveCommandOnPath(BIN_COMMAND, {
+      platform: 'linux',
+      env: { PATH: '/usr/local/bin:/opt/bin' },
+      isFile: (candidate) => candidate === '/opt/bin/skillforge-mcp',
+    })).toBe('/opt/bin/skillforge-mcp');
   });
 });

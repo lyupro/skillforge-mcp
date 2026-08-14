@@ -21,6 +21,14 @@ The server now exits when its client goes away. Before this release it never exi
 
 - **Recommended install is now global** (`npm install -g` then `skillforge install --all`) rather than a one-shot `npx` run. An ephemeral `npx` installer cannot write a path to itself, so it registers the `npx` form, which costs a wrapper process alongside every server.
 
+### Security
+
+- **`install --dry-run` no longer prints the host config.** It previously dumped the entire file before and after the edit — on a real machine, 5751 lines containing the API keys and connection strings of unrelated MCP servers. Anyone pasting that output into a bug report published their own secrets. The preview now shows only the `skillforge` entry plus a line confirming other entries are untouched; `--show-full-config` opts back into the full dump and says what it exposes. Present since at least 1.12.0.
+
+### Fixed
+
+- **`--entry bin` was unreachable on Windows.** The probe spawned `skillforge-mcp --version` without a shell, which cannot work there: a bare name yields `ENOENT`, and Node deliberately refuses to execute a `.cmd` shim without a shell (the BatBadBut mitigation, CVE-2024-27980). `npx` fails the same probe yet runs fine as a registered MCP command, which proves hosts resolve npm shims themselves. The probe now resolves the command through `PATH` honouring `PATHEXT`, then probes that concrete file — using a shell only for a resolved Windows `.cmd`/`.bat` shim, where the path is trusted and the command name is a module constant.
+
 ### Verified
 
 - 992 tests passing + 2 skipped; `tsc --noEmit` clean; 95 files ≤ 400 lines; `build` + `smoke` green. `tests/integration/lifecycle-exit.test.ts` spawns the built server, closes the transport, and fails if the process outlives it — covering both the stdin-close path and the parent-death path. The probe that selects the `bin` form closes stdin and bounds its wait, so an older server-style bin that waits on stdin cannot hang the installer.
