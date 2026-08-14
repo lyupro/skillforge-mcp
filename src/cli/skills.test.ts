@@ -57,6 +57,10 @@ function makeFakeDeps(
       getAll: () => skills as SkillSummary[],
       has: (name: string) => skills.some((s) => s.name === name),
       get: (name: string) => skills.find((s) => s.name === name),
+      getCandidates: (name: string) => skills.filter((s) => s.name === name),
+      getRootFolders: () => folders.map((f) => f.path),
+      replaceRoot: () => [],
+      setFolderPriority: () => undefined,
       clear: () => undefined,
       register: () => undefined,
     },
@@ -307,6 +311,13 @@ function makeMultiDeps(names: string[]): () => Promise<ServerDeps> {
         getAll: () => [...byName.values()],
         has: (name: string) => byName.has(name),
         get: (name: string) => byName.get(name),
+        getCandidates: (name: string) => {
+          const found = byName.get(name);
+          return found ? [found] : [];
+        },
+        getRootFolders: () => ['/skills'],
+        replaceRoot: () => [],
+        setFolderPriority: () => undefined,
         clear: () => undefined,
         register: () => undefined,
       },

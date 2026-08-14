@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { ensureRegistryFresh, rebuildRegistry } from './loader.js';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ensureRegistryFresh, rebuildRegistry, scanFolder } from './loader.js';
 import { SkillRegistry } from '../core/skill-registry.js';
 import { SkillResolver } from '../core/skill-resolver.js';
 import { SkillMetadataCache } from '../core/skill-metadata-cache.js';
@@ -11,7 +14,7 @@ import { PatternScanner } from '../security/pattern-scanner.js';
 import { SandboxRunner } from '../security/sandbox-runner.js';
 import { DecoratorChain, stderrLogger, createLeveledLogger } from '../decorators/index.js';
 import type { Logger, LogLevel } from '../decorators/index.js';
-import { INDEX_VERSION, computeFingerprint } from '../core/index.js';
+import { INDEX_VERSION, SkillIndexStore, computeFingerprint } from '../core/index.js';
 import type { RegistryIndex } from '../core/index.js';
 import type { ServerDeps } from '../server-deps.js';
 import type { SkillContent } from '../core/types.js';
@@ -63,10 +66,11 @@ function makeDeps(overrides: Partial<{
   const parseErrors = overrides.parseError ?? new Map();
   const cacheValid = overrides.cacheValid ?? false;
 
+  const resolver = new SkillResolver();
   return {
     folders,
-    registry: new SkillRegistry(),
-    resolver: new SkillResolver(),
+    registry: new SkillRegistry(folders, resolver),
+    resolver,
     metadataCache: {
       isValid: () => cacheValid,
       markFresh: vi.fn(),
@@ -260,6 +264,7 @@ describe('ensureRegistryFresh', () => {
 
     const winner = deps.registry.get('shared-skill');
     expect(winner?.folder).toBe(folder1);
+    expect(deps.registry.getCandidates('shared-skill')).toHaveLength(2);
     const cachedContent = deps.contentCache.get('shared-skill');
     expect(cachedContent?.folder).toBe(folder1);
     const collisionLines = lines.filter((l) =>
@@ -271,6 +276,52 @@ describe('ensureRegistryFresh', () => {
 });
 
 describe('rebuildRegistry', () => {
+  it('scans one folder and returns only its candidates and parse errors', async () => {
+    const folder = '/one';
+    const other = '/two';
+    const good = makeContent('good-skill', folder);
+    const deps = makeDeps({
+      folders: [folder, other],
+      scanResults: new Map([
+        [folder, [`${folder}/good.md`, `${folder}/bad.md`]],
+        [other, [`${other}/other.md`]],
+      ]),
+      parseResults: new Map([
+        [`${folder}/good.md`, good],
+        [`${other}/other.md`, makeContent('other-skill', other)],
+      ]),
+      parseError: new Map([[`${folder}/bad.md`, new Error('bad frontmatter')]]),
+    });
+
+    const result = await scanFolder(deps, folder);
+
+    expect(result.candidates.map((candidate) => candidate.name)).toEqual(['good-skill']);
+    expect(result.errors).toEqual([{ path: `${folder}/bad.md`, message: 'bad frontmatter' }]);
+    expect(deps.scanner.scan).toHaveBeenCalledTimes(1);
+    expect(deps.scanner.scan).toHaveBeenCalledWith(folder);
+  });
+
+  it('keeps candidates from healthy folders when another folder has parse errors', async () => {
+    const badFolder = '/bad';
+    const goodFolder = '/good';
+    const deps = makeDeps({
+      folders: [badFolder, goodFolder],
+      scanResults: new Map([
+        [badFolder, [`${badFolder}/broken.md`]],
+        [goodFolder, [`${goodFolder}/working.md`]],
+      ]),
+      parseResults: new Map([
+        [`${goodFolder}/working.md`, makeContent('working-skill', goodFolder)],
+      ]),
+      parseError: new Map([[`${badFolder}/broken.md`, new Error('broken')]]),
+    });
+
+    const stats = await rebuildRegistry(deps, { errorSink: [] });
+
+    expect(stats.errors).toEqual([{ path: `${badFolder}/broken.md`, message: 'broken' }]);
+    expect(deps.registry.get('working-skill')?.folder).toBe(goodFolder);
+  });
+
   it('errorSink supplied + scanner throws → error pushed to sink, NOT to the logger', async () => {
     const { logger, lines } = captureLogger();
     const folder = '/missing';
@@ -427,6 +478,7 @@ describe('ensureRegistryFresh — on-disk index', () => {
       fingerprint,
       skills: {
         'cached-skill': {
+          name: 'cached-skill',
           sourcePath: '/no-such-folder/cached-skill.md',
           folder: '/no-such-folder',
           format: 'claude',
@@ -474,6 +526,31 @@ describe('ensureRegistryFresh — on-disk index', () => {
 
     expect(saved.length).toBe(1);
     expect(saved[0]!.version).toBe(INDEX_VERSION);
+  });
+
+  it('rebuilds when an index from the previous format version is ignored', async () => {
+    const folders = ['/no-such-folder'];
+    const fingerprint = await computeFingerprint(folders);
+    const directory = await mkdtemp(join(tmpdir(), 'skillforge-loader-index-'));
+    const indexPath = join(directory, 'registry-index.json');
+    const oldIndex = {
+      version: INDEX_VERSION - 1,
+      fingerprint,
+      skills: {},
+    };
+    await writeFile(indexPath, JSON.stringify(oldIndex), 'utf8');
+    const store = new SkillIndexStore(indexPath);
+    const saveSpy = vi.spyOn(store, 'save');
+    const deps = makeDeps({ folders, indexStore: store, indexEnabled: true });
+
+    try {
+      await ensureRegistryFresh(deps);
+
+      expect(deps.scanner.scan).toHaveBeenCalledOnce();
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({ version: INDEX_VERSION }));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('skips the index entirely when indexEnabled is false', async () => {

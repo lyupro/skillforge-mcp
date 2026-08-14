@@ -259,12 +259,13 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
   // The parser consults it for candidate recognition, name resolution, and
   // directory-name derivation.
   const formatRegistry = SkillFormatRegistry.fromConfig(resolved.persisted);
+  const resolver = new SkillResolver(resolved.persisted.versionPolicy);
 
   deps = {
     folders: resolved.folders,
     configStore,
-    registry: new SkillRegistry(),
-    resolver: new SkillResolver(resolved.persisted.versionPolicy),
+    registry: new SkillRegistry(resolved.folders, resolver),
+    resolver,
     metadataCache,
     contentCache: new SkillContentCache({ ttlMs: resolved.ttlMs }),
     indexStore,

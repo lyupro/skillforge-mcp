@@ -16,29 +16,37 @@ export interface RebuildStats {
   errors: Array<{ path: string; message: string }>;
 }
 
+export interface FolderScanResult {
+  candidates: SkillMetadata[];
+  errors: Array<{ path: string; message: string }>;
+}
+
 /** Build a RegistryIndex snapshot from the current registry contents plus a
  *  freshly computed fingerprint of the configured folders. */
 async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
   const fingerprint = await computeFingerprint(deps.folders);
   const skills: RegistryIndex['skills'] = {};
 
-  for (const meta of deps.registry.getAll()) {
-    let mtimeMs = 0;
-    try {
-      mtimeMs = (await stat(meta.sourcePath)).mtimeMs;
-    } catch {
-      // File vanished between scan and snapshot — fingerprint will catch it.
+  for (const name of deps.registry.getAll().map((meta) => meta.name)) {
+    for (const meta of deps.registry.getCandidates(name)) {
+      let mtimeMs = 0;
+      try {
+        mtimeMs = (await stat(meta.sourcePath)).mtimeMs;
+      } catch {
+        // File vanished between scan and snapshot — fingerprint will catch it.
+      }
+      skills[`${meta.name}\0${meta.folder}\0${meta.sourcePath}`] = {
+        name: meta.name,
+        sourcePath: meta.sourcePath,
+        folder: meta.folder,
+        format: meta.format,
+        mtimeMs,
+        description: meta.description,
+        tags: meta.tags,
+        formatId: meta.formatId,
+        nameSource: meta.nameSource,
+      };
     }
-    skills[meta.name] = {
-      sourcePath: meta.sourcePath,
-      folder: meta.folder,
-      format: meta.format,
-      mtimeMs,
-      description: meta.description,
-      tags: meta.tags,
-      formatId: meta.formatId,
-      nameSource: meta.nameSource,
-    };
   }
 
   return { version: INDEX_VERSION, fingerprint, skills };
@@ -64,9 +72,9 @@ async function persistIndex(deps: ServerDeps): Promise<void> {
 function hydrateFromIndex(deps: ServerDeps, index: RegistryIndex): void {
   deps.registry.clear();
   deps.contentCache.clear();
-  for (const [name, entry] of Object.entries(index.skills)) {
+  for (const [key, entry] of Object.entries(index.skills)) {
     const meta: SkillMetadata = {
-      name,
+      name: entry.name ?? key,
       sourcePath: entry.sourcePath,
       folder: entry.folder,
       format: entry.format,
@@ -80,6 +88,52 @@ function hydrateFromIndex(deps: ServerDeps, index: RegistryIndex): void {
   deps.metadataCache.markFresh();
 }
 
+/** Scan and parse one configured root without affecting any other root. */
+export async function scanFolder(deps: ServerDeps, folder: string): Promise<FolderScanResult> {
+  const candidates: SkillMetadata[] = [];
+  const errors: FolderScanResult['errors'] = [];
+  let filePaths: string[];
+  try {
+    filePaths = await deps.scanner.scan(folder);
+  } catch (err) {
+    errors.push({ path: folder, message: err instanceof Error ? err.message : String(err) });
+    return { candidates, errors };
+  }
+
+  for (const filePath of filePaths) {
+    let content;
+    try {
+      content = await deps.parser.tryParseFile(filePath, folder);
+      if (content === null) continue;
+    } catch (err) {
+      errors.push({ path: filePath, message: err instanceof Error ? err.message : String(err) });
+      continue;
+    }
+
+    const { body: _body, raw: _raw, ...metadata } = content;
+    const meta: SkillMetadata = metadata;
+    const verdict = deps.blacklistFilter.evaluate(content);
+    if (!verdict.allowed) {
+      const detail = verdict.reason === 'manual'
+        ? `blacklisted by "${verdict.pattern}"`
+        : `audit hit: ${verdict.pattern}`;
+      deps.logger.warn(`[skillforge] excluded "${meta.name}" from ${filePath} — ${detail}`);
+      continue;
+    }
+    for (const note of verdict.informationalNotes ?? []) {
+      deps.logger.debug(
+        `[skillforge] audit note (informational): "${note.pattern}" in ${note.reason} ` +
+          `— not blocking "${meta.name}"`,
+      );
+    }
+
+    candidates.push(meta);
+    deps.contentCache.set(meta.name + '\x00' + meta.sourcePath, content);
+  }
+
+  return { candidates, errors };
+}
+
 /** Unconditionally invalidate caches and rescan all configured folders.
  *  Pure rebuild — does NOT consult metadataCache.isValid() first.
  *  Used by both ensureRegistryFresh (after the freshness gate) and the
@@ -91,106 +145,44 @@ export async function rebuildRegistry(deps: ServerDeps, opts?: RebuildOptions): 
   deps.registry.clear();
   deps.contentCache.clear();
 
-  // Collect all candidates grouped by skill name for conflict resolution.
-  const candidates = new Map<string, SkillMetadata[]>();
-
   for (const folder of deps.folders) {
-    let filePaths: string[];
-    try {
-      filePaths = await deps.scanner.scan(folder);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+    const result = await scanFolder(deps, folder);
+    deps.registry.replaceRoot(folder, result.candidates);
+    for (const error of result.errors) {
       if (errorSink !== undefined) {
-        errorSink.push({ path: folder, message: msg });
+        errorSink.push(error);
+      } else if (error.path === folder) {
+        deps.logger.warn(`[skillforge] skipped folder ${folder}: ${error.message}`);
       } else {
-        // A whole folder failing to scan is a real config problem — warn so it
-        // shows under the default `info` level.
-        deps.logger.warn(`[skillforge] skipped folder ${folder}: ${msg}`);
+        deps.logger.debug(`[skillforge] skipped ${error.path}: ${error.message}`);
       }
-      continue;
-    }
-
-    for (const filePath of filePaths) {
-      let content;
-      try {
-        // Two-phase: matchFile() runs first; a non-candidate (no enabled format
-        // descriptor matches) returns null and is silently dropped — no log
-        // line, because the file was never going to be a skill (`README.md`,
-        // `references/*.md`, `assets/*.md` siblings inside a skill directory).
-        content = await deps.parser.tryParseFile(filePath, folder);
-        if (content === null) continue;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (errorSink !== undefined) {
-          errorSink.push({ path: filePath, message: msg });
-        } else {
-          // A real defect in a recognised skill file (broken frontmatter on a
-          // `SKILL.md` / `AGENTS.md`, missing `name` on a candidate). Debug so
-          // the default level stays clean.
-          deps.logger.debug(`[skillforge] skipped ${filePath}: ${msg}`);
-        }
-        continue;
-      }
-
-      // Derive metadata snapshot (strip body + raw).
-      const { body: _body, raw: _raw, ...metadata } = content;
-      const meta: SkillMetadata = metadata;
-
-      const verdict = deps.blacklistFilter.evaluate(content);
-      if (!verdict.allowed) {
-        const detail = verdict.reason === 'manual'
-          ? `blacklisted by "${verdict.pattern}"`
-          : `audit hit: ${verdict.pattern}`;
-        // Blacklist rejection drops a skill from the registry — operator must
-        // see it. Always warn, never route through the sink.
-        deps.logger.warn(`[skillforge] excluded "${meta.name}" from ${filePath} — ${detail}`);
-        continue;
-      }
-      for (const note of verdict.informationalNotes ?? []) {
-        deps.logger.debug(
-          `[skillforge] audit note (informational): "${note.pattern}" in ${note.reason} ` +
-            `— not blocking "${meta.name}"`,
-        );
-      }
-
-      const existing = candidates.get(meta.name) ?? [];
-      existing.push(meta);
-      candidates.set(meta.name, existing);
-
-      // Store full content so resolve winner can be cached below.
-      // We keep all candidates' content; winner selection happens after.
-      deps.contentCache.set(meta.name + '\x00' + folder, content);
     }
   }
 
-  // Resolve conflicts and register winners.
-  for (const [name, group] of candidates) {
-    const winner = deps.resolver.resolve(group, deps.folders);
-    // A name shared by skills in more than one folder — warn and keep the
-    // resolver's priority-ordered winner; the losing copies stay on disk
-    // unregistered. Derived directory names flow through this same path, so a
-    // derived name colliding with a frontmatter name is deduped here too.
+  for (const winner of deps.registry.getAll()) {
+    const group = deps.registry.getCandidates(winner.name);
+    // A name shared by multiple candidates — warn and report the registry's
+    // priority-ordered winner. Derived directory names flow through this same
+    // path, so a derived name colliding with a frontmatter name is deduped too.
     if (group.length > 1) {
       const losers = group
         .filter((m) => m !== winner)
         .map((m) => m.sourcePath)
         .join(', ');
       deps.logger.warn(
-        `[skillforge] name collision for "${name}" — kept ${winner.sourcePath}, ` +
+        `[skillforge] name collision for "${winner.name}" — kept ${winner.sourcePath}, ` +
           `ignored: ${losers}`,
       );
     }
-    deps.registry.register(winner);
-
     // Retrieve the full content for the winner from the temporary keyed cache.
-    const tempKey = name + '\x00' + winner.folder;
+    const tempKey = winner.name + '\x00' + winner.sourcePath;
     const winnerContent = deps.contentCache.get(tempKey);
     if (winnerContent !== undefined) {
-      deps.contentCache.set(name, winnerContent);
+      deps.contentCache.set(winner.name, winnerContent);
     }
     // Clean up temp keys (all candidates for this name).
     for (const candidate of group) {
-      deps.contentCache.invalidate(name + '\x00' + candidate.folder);
+      deps.contentCache.invalidate(winner.name + '\x00' + candidate.sourcePath);
     }
   }
 

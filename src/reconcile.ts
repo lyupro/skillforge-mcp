@@ -9,6 +9,9 @@ export async function reconcileFolders(deps: ServerDeps): Promise<PersistedConfi
   const resolved = await loadResolvedConfig(process.env, deps.configStore);
   // Splice in-place so all references to deps.folders see the new list.
   deps.folders.splice(0, deps.folders.length, ...resolved.folders);
+  // Update the order in place instead of rebuilding the registry: a fresh
+  // instance would strand every reference already handed to a tool handler.
+  deps.registry.setFolderPriority(deps.folders);
   deps.blacklistFilter.setManualBlacklist(persisted.blacklist);
   deps.metadataCache.invalidate();
   // Drop the on-disk index too — the configured folder set may have changed,

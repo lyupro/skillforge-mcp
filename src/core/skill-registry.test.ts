@@ -115,6 +115,20 @@ describe('SkillRegistry', () => {
     expect(registry.get('shadowed')).toBe(shadowingWinner);
   });
 
+  it('setFolderPriority re-decides winners on the same instance', () => {
+    registry = new SkillRegistry(['/high', '/low']);
+    const high = makeSkill('shared', '/high');
+    const low = makeSkill('shared', '/low');
+    registry.register(low);
+    registry.register(high);
+    expect(registry.get('shared')).toBe(high);
+
+    registry.setFolderPriority(['/low', '/high']);
+
+    expect(registry.get('shared')).toBe(low);
+    expect(registry.getCandidates('shared')).toEqual([high, low]);
+  });
+
   it('an equivalent folder rescan does not report an unchanged winner', () => {
     registry = new SkillRegistry(['/high']);
     registry.register(makeSkill('same', '/high'));

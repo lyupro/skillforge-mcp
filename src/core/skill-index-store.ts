@@ -20,9 +20,10 @@ import { z } from 'zod';
 import { readJsonSafe, writeJsonAtomic } from '../installers/atomic-write.js';
 
 /** Bumped when the on-disk index shape changes — older indexes load as null. */
-export const INDEX_VERSION = 2;
+export const INDEX_VERSION = 3;
 
 const indexEntrySchema = z.object({
+  name: z.string().optional(),
   sourcePath: z.string(),
   folder: z.string(),
   format: z.enum(['claude', 'codex', 'persona', 'custom']),

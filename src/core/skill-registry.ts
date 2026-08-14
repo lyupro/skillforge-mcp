@@ -5,6 +5,9 @@ import type { SkillMetadata } from './types.js';
 export class SkillRegistry {
   readonly #store = new Map<string, SkillCandidateSet>();
   readonly #resolver: SkillResolver;
+  // Mutated in place rather than reassigned: candidate sets capture this array
+  // through a getter, so a live update keeps every winner in sync with the
+  // configured folder order without rebuilding the registry.
   readonly #folderPriority: string[];
   readonly #rootFolders: string[] = [];
 
@@ -91,6 +94,10 @@ export class SkillRegistry {
 
   getRootFolders(): string[] {
     return [...this.#rootFolders];
+  }
+
+  setFolderPriority(folderPriority: readonly string[]): void {
+    this.#folderPriority.splice(0, this.#folderPriority.length, ...folderPriority);
   }
 
   get size(): number {
