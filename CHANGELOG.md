@@ -2,6 +2,29 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] — 2026-08-14
+
+The server now exits when its client goes away. Before this release it never exited at all.
+
+### Fixed
+
+- **Server processes never terminated.** `startServer()` connected the stdio transport without subscribing to its close event, and the SIGTERM/SIGINT handlers stopped the watchers without calling `process.exit`. MCP hosts shut a server down by closing its stdin, so a correctly-behaving host left a live process behind every session, held open by the chokidar watchers. Reported from a machine carrying 275 accumulated processes (~21 GB RSS), the oldest alive for 519 minutes; 111 of them orphaned. Measured after the fix: **10 ms** from stdin close to `exit(0)`.
+
+### Added
+
+- **Bounded shutdown path.** `transport.onclose`, stdin `end`/`close`, SIGTERM and SIGINT all route to one idempotent shutdown: stop the watchers, then exit 0. Watcher teardown gets `lifecycle.shutdownGraceMs` (default 2000) and no longer; the ceiling timer is `unref`'d so it cannot hold the loop open itself.
+- **Parent-death supervisor.** A single `unref`'d tick (`lifecycle.supervisorIntervalMs`, default 30000) exits the server when the process that spawned it no longer exists — covering hosts killed too hard for stdin to close. A reused PID reads as "parent alive", so the check can miss a death but never kills a live session.
+- **Opt-in idle timeout.** `lifecycle.idleTimeoutMs` (default `0` = off) exits a server with no tool calls for that long.
+- **`--entry bin` host registration.** Writes `command: "skillforge-mcp", args: ["serve"]` — no `npx` wrapper process per session, and no absolute path that a package upgrade invalidates. Chosen only when the installer spawns `skillforge-mcp --version` the way a host would (no shell) and gets this exact package version back; otherwise it falls back to the absolute dispatcher path and prints the reason. Explicit `--entry bin` fails loudly rather than substituting a shape you did not ask for. `--entry auto` now tries this form first. Both forms are recognised on re-install and removed by `--uninstall`.
+
+### Changed
+
+- **Recommended install is now global** (`npm install -g` then `skillforge install --all`) rather than a one-shot `npx` run. An ephemeral `npx` installer cannot write a path to itself, so it registers the `npx` form, which costs a wrapper process alongside every server.
+
+### Verified
+
+- 992 tests passing + 2 skipped; `tsc --noEmit` clean; 95 files ≤ 400 lines; `build` + `smoke` green. `tests/integration/lifecycle-exit.test.ts` spawns the built server, closes the transport, and fails if the process outlives it — covering both the stdin-close path and the parent-death path. The probe that selects the `bin` form closes stdin and bounds its wait, so an older server-style bin that waits on stdin cannot hang the installer.
+
 ## [1.13.0] — 2026-08-12
 
 The auto-audit now understands context: a skill that *documents* dangerous patterns no longer audits itself out of the registry, while real dangerous calls keep blocking.

@@ -7,6 +7,25 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.14.0 — A server that knows when to die
+
+**Release date:** 2026-08-14
+
+Every SkillForge server started before this release is probably still running. The server connected its stdio transport and never listened for it closing — and an MCP host shuts a server down precisely by closing its stdin. Nothing was listening, the file watchers held the event loop open, and the process stayed alive forever. This surfaced on a machine carrying **275 accumulated processes, ~21 GB of RSS**, the oldest alive for **519 minutes**, 111 of them orphaned from parents that had long since exited.
+
+- **The transport closing now ends the process.** `transport.onclose`, stdin `end`/`close`, SIGTERM and SIGINT all reach one idempotent shutdown: stop the watchers, then `exit(0)`. Measured on Windows 11: **10 ms** from stdin close to exit, where the same probe against 1.13.0 showed the process still alive after five seconds and never exiting at all.
+- **A hung watcher can no longer keep the process alive.** Teardown gets `lifecycle.shutdownGraceMs` (default 2000) and then the process exits regardless. The ceiling timer is `unref`'d, so the safety net cannot itself become the thing holding the loop open.
+- **A dead parent is also an exit condition.** One `unref`'d supervisor tick (default every 30 s) checks whether the process that spawned this server still exists — the case where a host is killed hard enough that stdin never closes. The check errs in one direction only: a recycled PID reads as "parent alive", so it may miss a death, but it will never kill a live session.
+- **Idle timeout is available and off.** `lifecycle.idleTimeoutMs: 0` by default, because a long session with no tool calls is normal, not a leak. Set it above zero if your usage says otherwise.
+- **Host registration prefers a command over a path.** `--entry bin` writes `command: "skillforge-mcp", args: ["serve"]`: no `npx` wrapper process shadowing every server, and no absolute path that the next package upgrade invalidates. It is chosen only when the installer spawns `skillforge-mcp --version` exactly the way a host would — no shell — and receives this exact version back. Anything less falls back to the absolute dispatcher path and says why. Asking for `--entry bin` explicitly and failing that check is an error, not a silent substitution.
+- **The recommended install changed.** `npm install -g @lyupro/skillforge-mcp` then `skillforge install --all`. A one-shot `npx` installer physically cannot register a path to itself, so it writes the `npx` form — which costs a wrapper process on every single session.
+
+**Engineering snapshot**
+
+- 992 tests passing + 2 skipped. The regression guard (`tests/integration/lifecycle-exit.test.ts`) spawns the real built server, performs an MCP handshake, closes the transport, and fails if the process outlives it — plus a second case that kills the parent while stdin stays open.
+- The version probe that selects the `bin` form closes stdin and bounds its wait. Server bins from releases before the CLI dispatcher answered an unknown argument by waiting on stdin forever; probing one without those guards would hang the installer on exactly the upgrade path this feature serves.
+- `pnpm lint` (`tsc --noEmit`) clean, `pnpm build` clean, `pnpm smoke` passes, 95 files ≤ 400 lines.
+
 ## v1.13.0 — An audit that reads context, not just strings
 
 **Release date:** 2026-08-12
