@@ -1,16 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import { pathToFileURL } from 'node:url';
+import type { spawnSync } from 'node:child_process';
 import {
   NPX_PKG,
+  BIN_COMMAND,
+  binEntry,
   npxEntry,
   localEntry,
   isEphemeralPath,
   resolveDispatcherPath,
   resolveAutoEntry,
   buildEntry,
+  resolveEntry,
+  probeBinVersion,
 } from './entry.js';
 
 describe('npxEntry / localEntry', () => {
+  it('binEntry uses the host-spawnable package command directly', () => {
+    expect(binEntry()).toEqual({ command: BIN_COMMAND, args: ['serve'] });
+  });
+
   it('npxEntry resolves the package from the registry with serve', () => {
     expect(npxEntry()).toEqual({ command: 'npx', args: ['-y', NPX_PKG, 'serve'] });
   });
@@ -75,6 +84,20 @@ describe('resolveAutoEntry', () => {
 });
 
 describe('buildEntry', () => {
+  it('entry=bin uses the short command when its exact version is reachable', () => {
+    expect(buildEntry({ entry: 'bin' }, '/fallback.js', {
+      packageVersion: '1.13.0',
+      probeBin: () => ({ ok: true, version: '1.13.0' }),
+    })).toEqual({ command: 'skillforge-mcp', args: ['serve'] });
+  });
+
+  it('entry=bin fails loudly when the command cannot be spawned without a shell', () => {
+    expect(() => buildEntry({ entry: 'bin' }, '/fallback.js', {
+      packageVersion: '1.13.0',
+      probeBin: () => ({ ok: false, reason: 'not spawnable without a shell' }),
+    })).toThrow(/Cannot use --entry bin.*not spawnable without a shell/);
+  });
+
   it('entry=npx → npx-entry', () => {
     expect(buildEntry({ entry: 'npx' }, '/fallback.js')).toEqual({
       command: 'npx',
@@ -101,10 +124,70 @@ describe('buildEntry', () => {
   });
 
   it('entry=auto without a binaryPath resolves a valid entry from this module', () => {
-    // Running under vitest the module path is stable (not under _npx), so
-    // auto resolves to a node-entry on the dispatcher.
-    const entry = buildEntry({ entry: 'auto' }, '/fallback.js');
-    expect(['node', 'npx']).toContain(entry.command);
-    expect(entry.args[entry.args.length - 1]).toBe('serve');
+    const entry = buildEntry({ entry: 'auto' }, '/fallback.js', {
+      packageVersion: '1.13.0',
+      probeBin: () => ({ ok: true, version: '1.13.0' }),
+    });
+    expect(entry).toEqual({ command: 'skillforge-mcp', args: ['serve'] });
+  });
+
+  it('entry=auto falls back to the direct path and explains a version mismatch', () => {
+    const result = resolveEntry({ entry: 'auto' }, '/fallback.js', {
+      packageVersion: '1.13.0',
+      probeBin: () => ({ ok: true, version: '1.12.0' }),
+      moduleUrl: pathToFileURL('/stable/dist/installers/entry.js').href,
+    });
+    expect(result.entry.command).toBe('node');
+    expect(result.entry.args[0].replace(/\\/g, '/')).toMatch(/\/stable\/dist\/cli\/dispatcher\.js$/);
+    expect(result.fallbackReason).toContain('reported "1.12.0"; expected "1.13.0"');
+  });
+
+  it('entry=auto falls back when the bin is not spawnable without a shell', () => {
+    const result = resolveEntry({ entry: 'auto' }, '/fallback.js', {
+      packageVersion: '1.13.0',
+      probeBin: () => ({ ok: false, reason: 'not spawnable without a shell' }),
+      moduleUrl: pathToFileURL('/stable/dist/installers/entry.js').href,
+    });
+    expect(result.entry.command).toBe('node');
+    expect(result.fallbackReason).toContain('not spawnable without a shell');
+  });
+
+  it('entry=auto falls back when an older bin hangs instead of answering', () => {
+    const result = resolveEntry({ entry: 'auto' }, '/fallback.js', {
+      packageVersion: '1.14.0',
+      probeBin: () => ({ ok: false, reason: 'skillforge-mcp could not be spawned without a shell: ETIMEDOUT' }),
+      moduleUrl: pathToFileURL('/stable/dist/installers/entry.js').href,
+    });
+    expect(result.entry.command).toBe('node');
+    expect(result.fallbackReason).toContain('ETIMEDOUT');
+  });
+});
+
+describe('probeBinVersion', () => {
+  /**
+   * Bins from releases before the CLI dispatcher answered an unrecognised
+   * argument by waiting on stdin forever. Without a closed stdin and a bounded
+   * wait the probe never returns and the install hangs — on exactly the upgrade
+   * path this feature exists to serve.
+   */
+  it('closes stdin and bounds the wait so an old hanging bin cannot freeze the install', () => {
+    let seen: Record<string, unknown> | undefined;
+    const spawnFn = ((_command: string, _args: string[], opts: Record<string, unknown>) => {
+      seen = opts;
+      return { error: Object.assign(new Error('spawnSync ETIMEDOUT'), { code: 'ETIMEDOUT' }) };
+    }) as unknown as typeof spawnSync;
+
+    const result = probeBinVersion(spawnFn);
+
+    expect(seen?.shell).toBe(false);
+    expect(seen?.stdio).toEqual(['ignore', 'pipe', 'pipe']);
+    expect(seen?.timeout).toBeGreaterThan(0);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('ETIMEDOUT');
+  });
+
+  it('reports the trimmed version when the bin answers', () => {
+    const spawnFn = (() => ({ status: 0, stdout: '1.14.0\n' })) as unknown as typeof spawnSync;
+    expect(probeBinVersion(spawnFn)).toEqual({ ok: true, version: '1.14.0' });
   });
 });

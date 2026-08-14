@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { readJsonSafe, writeJsonAtomic } from './atomic-write.js';
 import { cursorConfigPath, defaultBinaryPath } from './paths.js';
-import { buildEntry, type ServerEntry } from './entry.js';
+import { resolveEntry, type ServerEntry } from './entry.js';
 import type {
   Installer,
   InstallOptions,
@@ -88,8 +88,8 @@ export class CursorInstaller implements Installer {
 
   async install(opts: InstallOptions): Promise<InstallResult> {
     const existing = ((await readJsonSafe(this.#configPath)) as CursorConfig | null) ?? {};
-    const entry = buildEntry(opts, this.#binaryFallback);
     const prior = readSkillforge(existing);
+    const resolution = resolveEntry(opts, this.#binaryFallback);
 
     if (prior !== undefined && opts.force !== true) {
       return {
@@ -100,12 +100,13 @@ export class CursorInstaller implements Installer {
       };
     }
 
-    const next = mergeInstall(existing, entry);
+    const next = mergeInstall(existing, resolution.entry);
     await writeJsonAtomic(this.#configPath, next);
     return {
       tool: this.name,
       status: prior !== undefined ? 'updated' : 'installed',
       configPath: this.#configPath,
+      message: resolution.fallbackReason,
     };
   }
 
@@ -126,7 +127,7 @@ export class CursorInstaller implements Installer {
     let nextValue: CursorConfig;
     if (opts.action === 'install') {
       const base = existing ?? {};
-      const entry = buildEntry(opts, this.#binaryFallback);
+      const entry = resolveEntry(opts, this.#binaryFallback).entry;
       nextValue = mergeInstall(base, entry);
     } else {
       nextValue = existing === null ? {} : mergeUninstall(existing);

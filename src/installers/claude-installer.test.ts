@@ -43,6 +43,16 @@ describe('ClaudeInstaller.detect', () => {
 });
 
 describe('ClaudeInstaller.install', () => {
+  it.each([
+    { command: 'skillforge-mcp', args: ['serve'] },
+    { command: 'node', args: ['/old/dist/cli/dispatcher.js', 'serve'] },
+  ])('recognizes an existing $command entry without duplicating it', async (entry) => {
+    writeFileSync(configPath, JSON.stringify({ mcpServers: { skillforge: entry } }));
+    const result = await makeInstaller().install({ entry: 'npx' });
+    expect(result.status).toBe('already-installed');
+    expect(Object.keys(JSON.parse(readFileSync(configPath, 'utf8')).mcpServers)).toEqual(['skillforge']);
+  });
+
   it('installs to empty config (file missing)', async () => {
     const inst = makeInstaller();
     const result = await inst.install({ entry: 'npx' });
@@ -121,6 +131,15 @@ describe('ClaudeInstaller.install', () => {
 });
 
 describe('ClaudeInstaller.uninstall', () => {
+  it.each([
+    { command: 'skillforge-mcp', args: ['serve'] },
+    { command: 'node', args: ['/old/dist/cli/dispatcher.js', 'serve'] },
+  ])('removes a $command entry form', async (entry) => {
+    writeFileSync(configPath, JSON.stringify({ mcpServers: { skillforge: entry } }));
+    expect((await makeInstaller().uninstall()).status).toBe('uninstalled');
+    expect(JSON.parse(readFileSync(configPath, 'utf8')).mcpServers.skillforge).toBeUndefined();
+  });
+
   it('removes the entry when present', async () => {
     writeFileSync(
       configPath,

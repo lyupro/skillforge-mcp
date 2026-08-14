@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { readTomlSafe, writeTomlAtomic } from './atomic-write.js';
 import { codexConfigPath, defaultBinaryPath } from './paths.js';
-import { buildEntry, type ServerEntry } from './entry.js';
+import { resolveEntry, type ServerEntry } from './entry.js';
 import type {
   Installer,
   InstallOptions,
@@ -81,7 +81,7 @@ export class CodexInstaller implements Installer {
   async install(opts: InstallOptions): Promise<InstallResult> {
     const existing = ((await readTomlSafe(this.#configPath)) as CodexConfig | null) ?? {};
     const servers = (existing.mcp_servers ?? {}) as Record<string, ServerEntry>;
-    const entry = buildEntry(opts, this.#binaryFallback);
+    const resolution = resolveEntry(opts, this.#binaryFallback);
 
     if (servers[SKILL_KEY] !== undefined && opts.force !== true) {
       return {
@@ -94,11 +94,16 @@ export class CodexInstaller implements Installer {
 
     const next: Record<string, unknown> = {
       ...existing,
-      mcp_servers: { ...servers, [SKILL_KEY]: entry },
+      mcp_servers: { ...servers, [SKILL_KEY]: resolution.entry },
     };
     await writeTomlAtomic(this.#configPath, next);
     const status = servers[SKILL_KEY] !== undefined ? 'updated' : 'installed';
-    return { tool: this.name, status, configPath: this.#configPath };
+    return {
+      tool: this.name,
+      status,
+      configPath: this.#configPath,
+      message: resolution.fallbackReason,
+    };
   }
 
   async uninstall(): Promise<UninstallResult> {
@@ -124,7 +129,7 @@ export class CodexInstaller implements Installer {
     if (opts.action === 'install') {
       const base = (existing ?? {}) as CodexConfig;
       const servers = (base.mcp_servers ?? {}) as Record<string, ServerEntry>;
-      const entry = buildEntry(opts, this.#binaryFallback);
+      const entry = resolveEntry(opts, this.#binaryFallback).entry;
       nextValue = { ...base, mcp_servers: { ...servers, [SKILL_KEY]: entry } };
     } else {
       if (existing === null || existing.mcp_servers === undefined) {

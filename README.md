@@ -28,10 +28,22 @@ One skill folder. One config file. Any tool can ask for any skill on demand.
 ## One-command install
 
 ```bash
-npx @lyupro/skillforge-mcp install --all
+npm install -g @lyupro/skillforge-mcp
+skillforge install --all
 ```
 
 Auto-detects Claude Code, Codex CLI, Cursor, and Hermes Agent on your machine and wires SkillForge into each. Supports `--dry-run`, `--uninstall`, and `--force`.
+
+**Install globally first, then run the installer from that install.** The entry it writes into each host config depends on where the installer itself lives:
+
+| How you run the installer | What lands in the host config | Cost |
+| --- | --- | --- |
+| Global install (above) | `command: "skillforge-mcp", args: ["serve"]` | One process per session; survives package upgrades |
+| `npx -y @lyupro/skillforge-mcp install --all` | `command: "npx", args: ["-y", …]` | An `npx` wrapper process alongside every server, and a registry round-trip on each spawn |
+
+A one-shot `npx` run cannot write a path to itself — its files live in a temp directory that will be gone tomorrow — so it writes the `npx` form. That form works, but each session then costs two processes instead of one. The global route is the recommended one.
+
+The short-command form is only written after the installer actually spawns `skillforge-mcp --version` the same way a host would (no shell) and gets back this exact package version. Anything else falls back to an absolute path to `dist/cli/dispatcher.js` and prints why.
 
 By default the installer edits each host's global config. Pass `--scope project` to wire SkillForge into a repo-local config rooted at the current directory instead — `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor), `.hermes/config.yaml` (Hermes Agent):
 
@@ -63,14 +75,17 @@ Restart your Claude Code session. The five tools (`skills__list`, `skills__get`,
 ### Option 2 — npm
 
 ```bash
-claude mcp add skillforge -- npx -y @lyupro/skillforge-mcp
+npm install -g @lyupro/skillforge-mcp
+claude mcp add skillforge -- skillforge-mcp serve
 ```
 
 Works for any MCP host that can spawn a stdio command (Claude Code, Codex CLI, Cursor). Or let the install CLI wire every detected host at once:
 
 ```bash
-npx -y @lyupro/skillforge-mcp install --all
+skillforge install --all
 ```
+
+`npx -y @lyupro/skillforge-mcp` still works and needs nothing installed, which makes it right for a one-off trial — but it adds a wrapper process to every session. Prefer the global install for a setup you intend to keep.
 
 ### Option 3 — local build
 
@@ -291,6 +306,17 @@ For shared content across multiple tools, the convention is `~/.lyupro/skills/` 
 - **Manual blacklist:** `blacklist: string[]` excludes skills by pattern (case-sensitive). Three kinds are auto-classified by syntax: a plain name is an **exact** match; an entry with `*` or `?` but no `/` is a **name-glob** matched against the skill name (e.g. `wiki-*`, `*-draft`); any entry containing `/` is a **path-glob** matched against the skill source path relative to its registered root folder (e.g. `**/agenthub/**`, `internal/*/draft-*`). Existing plain-name entries are unchanged. Short-circuits before the audit step.
 - **Version policy:** `versionPolicy: { "<bundle>": "latest" | "<major.minor.patch>" }`. When one recursive root holds two installed versions of a bundle, the highest semver wins by default (`latest`). Pin a bundle to an exact version, or pin it to its current version to freeze it against newer installs.
 - **Hot reload:** chokidar watches all configured folders for `.md` add/change/unlink events. Debounced batches invalidate the metadata cache so the next `skills__list` re-scans. Folders mutated via `skills__configure` auto-re-watch via the same diff path.
+
+## Server lifecycle
+
+The server exits on its own when its client goes away. No cleanup script, no manual kill.
+
+- **Transport closed → exit.** MCP hosts shut a server down by closing its stdin. That, a `transport.onclose`, SIGTERM, or SIGINT all route to the same bounded shutdown: stop the watchers, then `process.exit(0)`. Measured on Windows 11: **10 ms** from stdin close to exit.
+- **Grace ceiling.** Watcher teardown gets `lifecycle.shutdownGraceMs` (default 2000) and no more. A watcher that hangs cannot keep the process alive — the ceiling timer is `unref`'d so it never holds the loop open itself.
+- **Parent died → exit.** A supervisor tick (default every 30 s, `unref`'d) checks whether the process that spawned this server still exists. This covers hosts killed hard enough that stdin never closes. It errs only toward staying alive: a reused PID reads as "parent alive", so it can miss a death but never kills a live session.
+- **Idle timeout — opt-in, off by default.** `lifecycle.idleTimeoutMs: 0` disables it. Set it above zero only if you want a server with no tool calls for that long to quit; a long session with no requests is normal.
+
+Keys live under `lifecycle` in the config — see [docs/CONFIGURATION.md](./docs/CONFIGURATION.md). A regression guard (`tests/integration/lifecycle-exit.test.ts`) spawns the built server, closes the transport, and fails if the process is still alive.
 
 ## Skill format
 

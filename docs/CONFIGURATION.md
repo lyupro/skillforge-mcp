@@ -137,6 +137,12 @@ The full Zod schema lives in `src/config/config-schema.ts`. Below is the camelCa
     "cacheTtlMs": 60000,
     "cacheMaxEntries": 128
   },
+  "lifecycle": {
+    "shutdownGraceMs": 2000,
+    "parentCheck": true,
+    "idleTimeoutMs": 0,
+    "supervisorIntervalMs": 30000
+  },
   "skillFormats": []
 }
 ```
@@ -225,6 +231,19 @@ stdout stays reserved for JSON payloads (`--json` mode on every command). Diagno
 | `defaultTimeoutMs` | `30000` | `TimeoutDecorator` budget when a skill omits `timeoutMs` in its frontmatter. |
 | `cacheTtlMs` | `60000` | `CacheDecorator` TTL when a skill omits `cacheTtlMs` in its frontmatter (but is otherwise cacheable). |
 | `cacheMaxEntries` | `128` | LRU eviction trigger for the invocation result cache. |
+
+### `lifecycle`
+
+| Field | Default | Effect |
+|-------|---------|--------|
+| `shutdownGraceMs` | `2000` | Maximum time allowed for watcher shutdown before the process exits with code `0`. |
+| `parentCheck` | `true` | Exits when the parent process captured at startup no longer exists. Disable only when a supervisor deliberately reparents the server. |
+| `idleTimeoutMs` | `0` | Optional inactivity watchdog measured from the latest MCP tool call. `0` disables idle shutdown. |
+| `supervisorIntervalMs` | `30000` | Shared interval for parent and idle checks. The timer is unreferenced and does not keep the process alive. |
+
+Closing the stdio transport or stdin always starts shutdown; these events are part of the
+server contract and cannot be disabled. `SIGTERM` and `SIGINT` use the same bounded path.
+Lifecycle settings are read at startup and require a server restart after editing.
 
 ### `skillFormats[]`
 

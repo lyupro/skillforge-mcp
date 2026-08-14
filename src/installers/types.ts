@@ -6,7 +6,7 @@
  * uniformly under `--all`, `--dry-run`, and `--uninstall`.
  */
 
-export type EntryKind = 'npx' | 'local' | 'auto';
+export type EntryKind = 'bin' | 'npx' | 'local' | 'auto';
 
 export interface InstallOptions {
   entry: EntryKind;

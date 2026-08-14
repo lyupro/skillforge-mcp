@@ -14,6 +14,7 @@ import { ConfigStore, defaultConfigPath, defaultIndexPath } from './config/index
 import { FolderWatcher, ConfigWatcher } from './watcher/index.js';
 import { reconcileFolders } from './reconcile.js';
 import { startRuntime, registerShutdown } from './runtime.js';
+import { createLifecycle, registerTransportShutdown } from './lifecycle.js';
 import {
   SkillRegistry,
   SkillResolver,
@@ -49,8 +50,19 @@ import {
   handleReload,
 } from './tools/index.js';
 
-export function buildServer(deps: ServerDeps): McpServer {
+export interface BuildServerOptions {
+  markActivity?: () => void;
+}
+
+export function buildServer(deps: ServerDeps, options: BuildServerOptions = {}): McpServer {
   const server = new McpServer({ name: 'skillforge-mcp', version: '0.1.0' });
+  const withActivity = <Args, Result>(
+    handler: (args: Args) => Promise<Result>,
+  ): ((args: Args) => Promise<Result>) =>
+    async (args) => {
+      options.markActivity?.();
+      return handler(args);
+    };
 
   server.registerTool(
     'skills__list',
@@ -62,7 +74,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         'Note: env-override folders (SKILLFORGE_FOLDERS) carry no tags — folderTag returns nothing for them.',
       inputSchema: listInputSchema,
     },
-    async (args) => {
+    withActivity(async (args) => {
       try {
         const result = await handleList(deps, args);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -70,7 +82,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: message }], isError: true };
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -80,7 +92,7 @@ export function buildServer(deps: ServerDeps): McpServer {
       description: 'Retrieve the full content (body + metadata) of a named skill.',
       inputSchema: getInputSchema,
     },
-    async (args) => {
+    withActivity(async (args) => {
       try {
         const result = await handleGet(deps, args);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -88,7 +100,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: message }], isError: true };
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -98,7 +110,7 @@ export function buildServer(deps: ServerDeps): McpServer {
       description: 'Invoke a skill by name, forwarding optional input to the strategy.',
       inputSchema: invokeInputSchema,
     },
-    async (args) => {
+    withActivity(async (args) => {
       try {
         const result = await handleInvoke(deps, args);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -106,7 +118,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: message }], isError: true };
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -117,7 +129,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         'Manage configured skill folders, blacklist, and reset to defaults. Mutates persisted config under defaultConfigPath().',
       inputSchema: configureInputSchema,
     },
-    async (args) => {
+    withActivity(async (args) => {
       try {
         const result = await handleConfigure(deps, args as Parameters<typeof handleConfigure>[1]);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -125,7 +137,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: message }], isError: true };
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -136,7 +148,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         'Force a full rescan of all configured folders, returning the diff (added/removed) and any per-file errors. Pass an optional folder name to validate it is currently configured (the rescan itself remains global).',
       inputSchema: reloadInputSchema,
     },
-    async (args) => {
+    withActivity(async (args) => {
       try {
         const result = await handleReload(deps, args as Parameters<typeof handleReload>[1]);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -144,7 +156,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: message }], isError: true };
       }
-    },
+    }),
   );
 
   return server;
@@ -278,8 +290,14 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
  */
 export async function startServer(): Promise<void> {
   const deps = await buildDeps();
-  const server = buildServer(deps);
-  await server.connect(new StdioServerTransport());
+  const lifecycle = createLifecycle({
+    deps,
+    config: (await deps.configStore.load()).lifecycle,
+  });
+  const server = buildServer(deps, { markActivity: lifecycle.markActivity });
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  registerTransportShutdown({ transport, lifecycle });
   await startRuntime(deps);
-  registerShutdown(deps);
+  registerShutdown(lifecycle.shutdown);
 }

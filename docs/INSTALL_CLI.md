@@ -22,13 +22,22 @@ npx @lyupro/skillforge-mcp install [flags]
 | `--dry-run` | Print the exact `before` and `after` content per host. No disk writes. |
 | `--uninstall` | Reverse a previous install — remove the `skillforge` entry, leave everything else untouched |
 | `--force` | Overwrite an existing `skillforge` entry (default is to refuse with `already-installed`) |
-| `--entry auto` | Default. Detects how the installer runs: a stable install writes `{ command: "node", args: ["<absolute dist/cli/dispatcher.js>", "serve"] }`; a one-shot `npx … install` run falls back to `{ command: "npx", args: ["-y", "@lyupro/skillforge-mcp", "serve"] }` |
+| `--entry auto` | Default. First tries the verified bin form. If that check fails, a stable install writes the direct `node` path and a one-shot `npx … install` run uses the `npx` form. The install output explains why it fell back. |
+| `--entry bin` | Requires `{ command: "skillforge-mcp", args: ["serve"] }`. The command must run without a shell and report the exact version being installed; otherwise installation fails. |
 | `--entry npx` | Explicit override. Writes `{ command: "npx", args: ["-y", "@lyupro/skillforge-mcp", "serve"] }` |
 | `--entry local` | Explicit override. Writes `{ command: "node", args: ["<binary-path>", "serve"] }` |
 | `--binary-path PATH` | Override the local-entry binary path (defaults to `<package>/dist/cli/dispatcher.js`) |
 | `--help`, `-h` | Show usage |
 
 At least one of `--claude`, `--codex`, `--cursor`, `--hermes`, or `--all` is required.
+
+The `auto` probe runs `skillforge-mcp --version` exactly as an MCP host will:
+without a shell. The short form is used only when that process exits successfully
+and its output exactly matches this package's version. A missing command, a
+Windows shim that only works through a shell, or a stale global version causes a
+reported fallback to the existing stable-path / ephemeral-`npx` behavior. Use
+`--entry bin` when fallback is unacceptable; that explicit mode exits non-zero
+instead of silently changing the requested entry shape.
 
 ## Examples
 
@@ -212,5 +221,11 @@ See [README → Update the CLI](../README.md#update-the-cli--skillforge-update) 
 | `[<host>] error: EACCES` | Host config path is not writable | Check ownership/permissions on the file (or the parent directory if the file does not yet exist) |
 | `No supported hosts detected` | `--all` was used but no host binary is on PATH and no host config file exists | Pass `--claude` / `--codex` / `--cursor` / `--hermes` explicitly to force-install regardless of detection |
 | Old entry still active after install | The host tool was running while you ran `install` | Restart the host (Claude Code session, Codex CLI session, Cursor app, or Hermes session / gateway) |
+| Host reports it cannot start `skillforge-mcp`, but the same command works in your terminal | The probe verified the command in the **installer's** environment; the host runs with a different `PATH` (common for apps launched from a desktop session rather than a shell) | Re-register on an absolute path: `skillforge install --claude --entry local --force` |
+| Dozens of server processes accumulating | Server versions before 1.14.0 never exited when the host closed the transport | Upgrade to 1.14.0 or later; the server now exits on transport close, on signals, and when its parent process disappears |
+
+### Known limitation — the probe sees the installer's PATH, not the host's
+
+Choosing the `bin` form requires spawning `skillforge-mcp --version` successfully, but that spawn happens in whatever environment the installer runs in. A host started from a desktop session can carry a different `PATH` than your shell. The failure is loud rather than silent — the host reports that the server did not start — and the fix is the `--entry local --force` re-registration above.
 
 See [INSTALL.md](./INSTALL.md) for the underlying manual wiring steps that the CLI automates.

@@ -18,15 +18,19 @@ export async function stopRuntime(deps: ServerDeps): Promise<void> {
   await deps.configWatcher.stop();
 }
 
-/** Registers SIGTERM/SIGINT handlers that tear the runtime down gracefully. */
-export function registerShutdown(deps: ServerDeps): void {
-  const shutdown = async (): Promise<void> => {
-    await stopRuntime(deps);
-  };
-  process.once('SIGTERM', () => {
+export interface SignalTarget {
+  once(event: 'SIGTERM' | 'SIGINT', listener: () => void): unknown;
+}
+
+/** Routes process signals through the lifecycle's bounded shutdown path. */
+export function registerShutdown(
+  shutdown: () => Promise<void>,
+  signalTarget: SignalTarget = process,
+): void {
+  signalTarget.once('SIGTERM', () => {
     void shutdown();
   });
-  process.once('SIGINT', () => {
+  signalTarget.once('SIGINT', () => {
     void shutdown();
   });
 }

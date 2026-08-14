@@ -76,6 +76,15 @@ const invocationSchema = z
   })
   .passthrough();
 
+const lifecycleSchema = z
+  .object({
+    shutdownGraceMs: z.number().nonnegative().default(2_000),
+    parentCheck: z.boolean().default(true),
+    idleTimeoutMs: z.number().nonnegative().default(0),
+    supervisorIntervalMs: z.number().positive().default(30_000),
+  })
+  .passthrough();
+
 // Recognition rule for a skill format — a discriminated union so a malformed
 // entry fails fast with a precise message. `filename` matches an exact name,
 // `filenameGlob` a shell-style glob, `frontmatterField` the presence of a
@@ -169,6 +178,7 @@ export const configSchema = z
     watcher: watcherSchema.default({}),
     logging: loggingSchema.default({}),
     invocation: invocationSchema.default({}),
+    lifecycle: lifecycleSchema.default({}),
     // Operator-supplied format descriptors, merged over the built-in defaults
     // by `id`. Defaults to an empty array — the resolved registry then equals
     // the four built-ins. Use `resolveSkillFormats()` to get the merged list.

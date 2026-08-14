@@ -109,6 +109,10 @@ describe('parseArgs', () => {
     expect(parseArgs(['--all', '--entry', 'auto']).entry).toBe('auto');
   });
 
+  it('parses --entry bin', () => {
+    expect(parseArgs(['--all', '--entry', 'bin']).entry).toBe('bin');
+  });
+
   it('rejects unknown flag with UsageError', () => {
     expect(() => parseArgs(['--bogus'])).toThrow(UsageError);
   });
@@ -146,6 +150,32 @@ describe('parseArgs', () => {
 });
 
 describe('runInstall dispatch', () => {
+  it('returns exit 1 when explicit --entry bin validation fails', async () => {
+    const installer = makeFakeInstaller('claude');
+    installer.install = async () => {
+      throw new Error('Cannot use --entry bin: command is not spawnable without a shell');
+    };
+    const cap = makeCapture();
+    const code = await runInstall(parseArgs(['--claude', '--entry', 'bin']), {
+      installers: [installer], stdout: cap.stdout, stderr: cap.stderr,
+    });
+    expect(code).toBe(1);
+    expect(cap.err.join('\n')).toContain('Cannot use --entry bin');
+  });
+
+  it('prints the auto fallback reason returned by an installer', async () => {
+    const installer = makeFakeInstaller('claude');
+    installer.install = async () => ({
+      tool: 'claude', status: 'installed', configPath: '/fake/claude',
+      message: 'Using fallback entry because versions differ',
+    });
+    const cap = makeCapture();
+    expect(await runInstall(parseArgs(['--claude']), {
+      installers: [installer], stdout: cap.stdout, stderr: cap.stderr,
+    })).toBe(0);
+    expect(cap.out.join('\n')).toContain('Using fallback entry because versions differ');
+  });
+
   it('--claude routes only to Claude installer', async () => {
     const claude = makeFakeInstaller('claude');
     const codex = makeFakeInstaller('codex');

@@ -34,7 +34,7 @@ export interface ParsedArgs {
   dryRun: boolean;
   uninstall: boolean;
   force: boolean;
-  entry: 'npx' | 'local' | 'auto';
+  entry: 'bin' | 'npx' | 'local' | 'auto';
   binaryPath?: string;
   scope: Scope;
   showHelp: boolean;
@@ -66,8 +66,10 @@ Modes:
 
 Entry shape:
   --entry auto        (default) detect this installer's own on-disk location:
-                        stable install     → command=node args=[<dispatcher.js>,'serve']
-                        ephemeral npx run   → command=npx  args=['-y','@lyupro/skillforge-mcp','serve']
+                        matching PATH bin   → command=skillforge-mcp args=['serve']
+                        stable fallback    → command=node args=[<dispatcher.js>,'serve']
+                        ephemeral fallback → command=npx args=['-y','@lyupro/skillforge-mcp','serve']
+  --entry bin         require command=skillforge-mcp args=['serve']; exact version required
   --entry npx         force command=npx  args=['-y','@lyupro/skillforge-mcp','serve']
   --entry local       force command=node args=[<binary-path>,'serve']
   --binary-path PATH  Override the binary path (defaults to dist/cli/dispatcher.js)
@@ -135,8 +137,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--entry': {
         const next = argv[++i];
-        if (next !== 'npx' && next !== 'local' && next !== 'auto') {
-          throw new UsageError(`--entry must be 'auto', 'npx', or 'local' (got: ${String(next)})`);
+        if (next !== 'bin' && next !== 'npx' && next !== 'local' && next !== 'auto') {
+          throw new UsageError(`--entry must be 'auto', 'bin', 'npx', or 'local' (got: ${String(next)})`);
         }
         out.entry = next;
         break;

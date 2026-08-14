@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { readJsonSafe, writeJsonAtomic } from './atomic-write.js';
 import { claudeConfigPath, defaultBinaryPath } from './paths.js';
-import { buildEntry, type ServerEntry } from './entry.js';
+import { resolveEntry, type ServerEntry } from './entry.js';
 import type {
   Installer,
   InstallOptions,
@@ -71,7 +71,7 @@ export class ClaudeInstaller implements Installer {
   async install(opts: InstallOptions): Promise<InstallResult> {
     const existing = ((await readJsonSafe(this.#configPath)) as ClaudeConfig | null) ?? {};
     const servers = existing.mcpServers ?? {};
-    const entry = buildEntry(opts, this.#binaryFallback);
+    const resolution = resolveEntry(opts, this.#binaryFallback);
 
     if (servers[SKILL_KEY] !== undefined && opts.force !== true) {
       return {
@@ -84,11 +84,16 @@ export class ClaudeInstaller implements Installer {
 
     const next: ClaudeConfig = {
       ...existing,
-      mcpServers: { ...servers, [SKILL_KEY]: entry },
+      mcpServers: { ...servers, [SKILL_KEY]: resolution.entry },
     };
     await writeJsonAtomic(this.#configPath, next);
     const status = servers[SKILL_KEY] !== undefined ? 'updated' : 'installed';
-    return { tool: this.name, status, configPath: this.#configPath };
+    return {
+      tool: this.name,
+      status,
+      configPath: this.#configPath,
+      message: resolution.fallbackReason,
+    };
   }
 
   async uninstall(): Promise<UninstallResult> {
@@ -114,7 +119,7 @@ export class ClaudeInstaller implements Installer {
     if (opts.action === 'install') {
       const base = existing ?? {};
       const servers = base.mcpServers ?? {};
-      const entry = buildEntry(opts, this.#binaryFallback);
+      const entry = resolveEntry(opts, this.#binaryFallback).entry;
       nextValue = { ...base, mcpServers: { ...servers, [SKILL_KEY]: entry } };
     } else {
       if (existing === null || existing.mcpServers === undefined) {

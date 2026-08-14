@@ -15,7 +15,7 @@ import { access } from 'node:fs/promises';
 import { Document, parseDocument } from 'yaml';
 import { readTextSafe, writeTextAtomic } from './atomic-write.js';
 import { hermesConfigPath, defaultBinaryPath } from './paths.js';
-import { buildEntry } from './entry.js';
+import { resolveEntry, type EntryResolution } from './entry.js';
 import type {
   Installer,
   InstallOptions,
@@ -47,14 +47,20 @@ interface HermesServerEntry {
   connect_timeout: number;
 }
 
-function buildHermesEntry(opts: InstallOptions, binaryFallback: string): HermesServerEntry {
-  const entry = buildEntry(opts, binaryFallback);
+function buildHermesEntry(
+  opts: InstallOptions,
+  binaryFallback: string,
+): EntryResolution & { entry: HermesServerEntry } {
+  const resolution = resolveEntry(opts, binaryFallback);
   return {
-    command: entry.command,
-    args: entry.args,
-    enabled: true,
-    timeout: HERMES_TIMEOUT,
-    connect_timeout: HERMES_CONNECT_TIMEOUT,
+    ...resolution,
+    entry: {
+      command: resolution.entry.command,
+      args: resolution.entry.args,
+      enabled: true,
+      timeout: HERMES_TIMEOUT,
+      connect_timeout: HERMES_CONNECT_TIMEOUT,
+    },
   };
 }
 
@@ -113,6 +119,7 @@ export class HermesInstaller implements Installer {
     const raw = await readTextSafe(this.#configPath);
     const doc = parseConfig(raw, this.#configPath);
     const exists = doc.hasIn([MCP_SERVERS_KEY, SKILL_KEY]);
+    const resolution = buildHermesEntry(opts, this.#binaryFallback);
 
     if (exists && opts.force !== true) {
       return {
@@ -123,12 +130,13 @@ export class HermesInstaller implements Installer {
       };
     }
 
-    doc.setIn([MCP_SERVERS_KEY, SKILL_KEY], buildHermesEntry(opts, this.#binaryFallback));
+    doc.setIn([MCP_SERVERS_KEY, SKILL_KEY], resolution.entry);
     await writeTextAtomic(this.#configPath, doc.toString());
     return {
       tool: this.name,
       status: exists ? 'updated' : 'installed',
       configPath: this.#configPath,
+      message: resolution.fallbackReason,
     };
   }
 
@@ -151,7 +159,10 @@ export class HermesInstaller implements Installer {
     const doc = parseConfig(raw, this.#configPath);
 
     if (opts.action === 'install') {
-      doc.setIn([MCP_SERVERS_KEY, SKILL_KEY], buildHermesEntry(opts, this.#binaryFallback));
+      doc.setIn(
+        [MCP_SERVERS_KEY, SKILL_KEY],
+        buildHermesEntry(opts, this.#binaryFallback).entry,
+      );
     } else if (doc.hasIn([MCP_SERVERS_KEY, SKILL_KEY])) {
       doc.deleteIn([MCP_SERVERS_KEY, SKILL_KEY]);
     }

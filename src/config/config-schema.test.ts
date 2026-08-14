@@ -25,6 +25,12 @@ describe('configSchema', () => {
     expect(result.watcher.debounceMs).toBe(500);
     expect(result.logging.level).toBe('info');
     expect(result.logging.file).toBeNull();
+    expect(result.lifecycle).toEqual({
+      shutdownGraceMs: 2_000,
+      parentCheck: true,
+      idleTimeoutMs: 0,
+      supervisorIntervalMs: 30_000,
+    });
   });
 
   it('defaultConfig() round-trips through JSON parse', () => {
@@ -69,6 +75,29 @@ describe('configSchema', () => {
 
   it('throws when logging.level is an unknown string', () => {
     expect(() => configSchema.parse({ logging: { level: 'verbose' } })).toThrow();
+  });
+
+  it('validates lifecycle timing boundaries', () => {
+    expect(() => configSchema.parse({ lifecycle: { shutdownGraceMs: -1 } })).toThrow();
+    expect(() => configSchema.parse({ lifecycle: { idleTimeoutMs: -1 } })).toThrow();
+    expect(() => configSchema.parse({ lifecycle: { supervisorIntervalMs: 0 } })).toThrow();
+  });
+
+  it('accepts explicit lifecycle settings', () => {
+    const result = configSchema.parse({
+      lifecycle: {
+        shutdownGraceMs: 250,
+        parentCheck: false,
+        idleTimeoutMs: 60_000,
+        supervisorIntervalMs: 1_000,
+      },
+    });
+    expect(result.lifecycle).toEqual({
+      shutdownGraceMs: 250,
+      parentCheck: false,
+      idleTimeoutMs: 60_000,
+      supervisorIntervalMs: 1_000,
+    });
   });
 
   it('accepts all valid logging levels', () => {
