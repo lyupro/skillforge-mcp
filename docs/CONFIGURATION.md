@@ -191,8 +191,8 @@ want the stricter behavior.
 
 | Field | Default | Effect |
 |-------|---------|--------|
-| `metadataTtlMs` | `300000` (5 min) | `SkillMetadataCache` freshness window. After expiry, the next `skills__list` rescans. Currently the runtime reads the env-side `SKILLFORGE_TTL_MS` for both metadata + content caches; this persisted field is reserved for the planned config-overrides-env wiring. |
-| `contentTtlMs` | `300000` | Same status as `metadataTtlMs` — currently env-driven. |
+| `metadataTtlMs` | `300000` (5 min) | `SkillMetadataCache` freshness window. After expiry, the next `skills__list` rescans. Resolved as **config key > `SKILLFORGE_TTL_MS` > default**; the key is optional, and an absent key means "not set" rather than "set to the default". `0` disables the cache (every call rescans). A malformed value is a startup error, not a silent default. When both sources are set, the config value wins and a line naming both is written to stderr. |
+| `contentTtlMs` | `300000` | Same rules as `metadataTtlMs`, resolved independently — `SKILLFORGE_TTL_MS` is the shared fallback for whichever key is unset. |
 | `maxSizeMb` | `50` | Reserved — content cache currently uses LRU eviction by entry count, not bytes. |
 | `indexEnabled` | `true` | Enables the persistent on-disk registry index. A fresh CLI process hydrates the registry from the index file with one read instead of a full cold scan. Set `false` (or pass `--no-cache`) to always do a full scan. |
 | `indexPath` | `null` | Absolute path to the index file. When `null`/absent it is derived as `<configDir>/cache/registry-index.json`. |
@@ -359,7 +359,13 @@ Replaces the persisted config with schema defaults. After reset: folders fall ba
 }
 ```
 
-The optional `folder` argument is validated against the configured folder list (you get an error if the folder isn't configured) but the rescan itself is always global — partial-folder reload is deferred. Use this when:
+The optional `folder` argument is validated against the configured folder list (you get an error if the folder isn't configured) and scopes the rescan to that folder alone — other configured folders are not walked. The response keeps its global meaning (`loaded`, `added` and `removed` describe the whole registry, so a skill promoted out of another folder still shows up), and a `scope` field is added naming the folder and how many skills were scanned in it:
+
+```json
+"scope": {"folder": "/home/me/skills", "scanned": 12}
+```
+
+Shadowing is handled correctly: if the reloaded folder loses a skill that was shadowing a copy in a lower-priority folder, that copy is promoted. Use this when:
 
 - A file changed but the watcher missed it (e.g. mass `git checkout`).
 - You want to see per-file parse errors (the `errors` array carries them; normal `skills__list` calls log to stderr only).
