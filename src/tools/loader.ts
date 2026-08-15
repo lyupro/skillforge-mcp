@@ -28,6 +28,7 @@ async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
   const skills: RegistryIndex['skills'] = {};
 
   for (const name of deps.registry.getAll().map((meta) => meta.name)) {
+    const entries: RegistryIndex['skills'][string] = [];
     for (const meta of deps.registry.getCandidates(name)) {
       let mtimeMs = 0;
       try {
@@ -35,8 +36,7 @@ async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
       } catch {
         // File vanished between scan and snapshot — fingerprint will catch it.
       }
-      skills[`${meta.name}\0${meta.folder}\0${meta.sourcePath}`] = {
-        name: meta.name,
+      entries.push({
         sourcePath: meta.sourcePath,
         folder: meta.folder,
         format: meta.format,
@@ -45,8 +45,9 @@ async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
         tags: meta.tags,
         formatId: meta.formatId,
         nameSource: meta.nameSource,
-      };
+      });
     }
+    skills[name] = entries;
   }
 
   return { version: INDEX_VERSION, fingerprint, skills };
@@ -72,18 +73,22 @@ async function persistIndex(deps: ServerDeps): Promise<void> {
 function hydrateFromIndex(deps: ServerDeps, index: RegistryIndex): void {
   deps.registry.clear();
   deps.contentCache.clear();
-  for (const [key, entry] of Object.entries(index.skills)) {
-    const meta: SkillMetadata = {
-      name: entry.name ?? key,
-      sourcePath: entry.sourcePath,
-      folder: entry.folder,
-      format: entry.format,
-      description: entry.description,
-      tags: entry.tags,
-      formatId: entry.formatId,
-      nameSource: entry.nameSource,
-    };
-    deps.registry.register(meta);
+  for (const [name, entries] of Object.entries(index.skills)) {
+    // The registry stores candidates newest-first because register() prepends.
+    // Reverse the persisted registry order to reproduce the full-scan order.
+    for (const entry of [...entries].reverse()) {
+      const meta: SkillMetadata = {
+        name,
+        sourcePath: entry.sourcePath,
+        folder: entry.folder,
+        format: entry.format,
+        description: entry.description,
+        tags: entry.tags,
+        formatId: entry.formatId,
+        nameSource: entry.nameSource,
+      };
+      deps.registry.register(meta);
+    }
   }
   deps.metadataCache.markFresh();
 }

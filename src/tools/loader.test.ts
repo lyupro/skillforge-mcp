@@ -477,7 +477,7 @@ describe('ensureRegistryFresh — on-disk index', () => {
       version: INDEX_VERSION,
       fingerprint,
       skills: {
-        'cached-skill': {
+        'cached-skill': [{
           name: 'cached-skill',
           sourcePath: '/no-such-folder/cached-skill.md',
           folder: '/no-such-folder',
@@ -485,7 +485,7 @@ describe('ensureRegistryFresh — on-disk index', () => {
           mtimeMs: 1,
           description: 'from index',
           tags: ['x'],
-        },
+        }],
       },
     };
     const { store } = makeIndexStore(index);

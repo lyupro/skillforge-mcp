@@ -4,7 +4,7 @@
  * Every `skills get` CLI call is a fresh process with an empty in-memory
  * metadata cache, which otherwise forces a full cold scan (recursive readdir
  * + frontmatter parse of every skill file). This store persists a snapshot of
- * the resolved registry to disk so subsequent processes can hydrate the
+ * all registry candidates to disk so subsequent processes can hydrate the
  * registry from one file read and parse only the requested skill.
  *
  * The index carries a fingerprint of the source folders (file paths +
@@ -20,10 +20,9 @@ import { z } from 'zod';
 import { readJsonSafe, writeJsonAtomic } from '../installers/atomic-write.js';
 
 /** Bumped when the on-disk index shape changes — older indexes load as null. */
-export const INDEX_VERSION = 3;
+export const INDEX_VERSION = 4;
 
 const indexEntrySchema = z.object({
-  name: z.string().optional(),
   sourcePath: z.string(),
   folder: z.string(),
   format: z.enum(['claude', 'codex', 'persona', 'custom']),
@@ -44,7 +43,7 @@ const indexEntrySchema = z.object({
 const registryIndexSchema = z.object({
   version: z.number(),
   fingerprint: z.string(),
-  skills: z.record(z.string(), indexEntrySchema),
+  skills: z.record(z.string(), z.array(indexEntrySchema)),
 });
 
 export type SkillIndexEntry = z.infer<typeof indexEntrySchema>;

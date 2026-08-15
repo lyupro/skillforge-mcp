@@ -9,12 +9,20 @@ function sampleIndex(): RegistryIndex {
     version: INDEX_VERSION,
     fingerprint: 'abc123',
     skills: {
-      'code-review': {
-        sourcePath: '/skills/code-review.md',
-        folder: '/skills',
-        format: 'claude',
-        mtimeMs: 1000,
-      },
+      'code-review': [
+        {
+          sourcePath: '/skills/code-review.md',
+          folder: '/skills',
+          format: 'claude',
+          mtimeMs: 1000,
+        },
+        {
+          sourcePath: '/workspace/skills/code-review.md',
+          folder: '/workspace/skills',
+          format: 'claude',
+          mtimeMs: 2000,
+        },
+      ],
     },
   };
 }
@@ -61,6 +69,19 @@ describe('SkillIndexStore', () => {
   it('returns null on a schema mismatch', async () => {
     const path = join(dir, 'registry-index.json');
     await writeFile(path, JSON.stringify({ version: INDEX_VERSION, skills: 'wrong' }), 'utf8');
+    const store = new SkillIndexStore(path);
+    expect(await store.load()).toBeNull();
+  });
+
+  it('returns null when a candidate record is corrupt', async () => {
+    const path = join(dir, 'registry-index.json');
+    await writeFile(path, JSON.stringify({
+      version: INDEX_VERSION,
+      fingerprint: 'abc123',
+      skills: {
+        'code-review': [{ sourcePath: 42 }],
+      },
+    }), 'utf8');
     const store = new SkillIndexStore(path);
     expect(await store.load()).toBeNull();
   });

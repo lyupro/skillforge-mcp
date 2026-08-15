@@ -26,7 +26,8 @@ function writeSkill(path: string, name: string): Promise<void> {
   return writeFile(path, `---\nname: ${name}\ndescription: ${name} desc\n---\nBody of ${name}\n`, 'utf8');
 }
 
-function makeRealDeps(folder: string, indexPath: string): ServerDeps {
+function makeRealDeps(folders: string | string[], indexPath: string): ServerDeps {
+  const configuredFolders = typeof folders === 'string' ? [folders] : folders;
   // metadataCache is forced invalid every call so the on-disk index — not the
   // in-process cache — is the path under test.
   const metadataCache = {
@@ -38,9 +39,9 @@ function makeRealDeps(folder: string, indexPath: string): ServerDeps {
   } as unknown as SkillMetadataCache;
 
   return {
-    folders: [folder],
+    folders: configuredFolders,
     configStore: {} as ServerDeps['configStore'],
-    registry: new SkillRegistry(),
+    registry: new SkillRegistry(configuredFolders),
     resolver: new SkillResolver(),
     metadataCache,
     contentCache: new SkillContentCache({ ttlMs: 300_000 }),
@@ -103,6 +104,45 @@ describe('ensureRegistryFresh — persistent index end-to-end', () => {
     expect(deps2.registry.get('skill-a')?.description).toBe('skill-a desc');
   });
 
+  it('persists all candidates and preserves the full-scan winner after hydration', async () => {
+    const higherFolder = join(dir, 'higher');
+    const lowerFolder = join(dir, 'lower');
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(higherFolder, { recursive: true });
+    await mkdir(lowerFolder, { recursive: true });
+    await writeSkill(join(higherFolder, 'shared.md'), 'shared-skill');
+    await writeSkill(join(lowerFolder, 'shared.md'), 'shared-skill');
+    const folders = [higherFolder, lowerFolder];
+
+    const scanned = makeRealDeps(folders, indexPath);
+    await ensureRegistryFresh(scanned);
+
+    const scannedWinner = scanned.registry.get('shared-skill');
+    const scannedCandidates = scanned.registry.getCandidates('shared-skill')
+      .map((candidate) => ({ folder: candidate.folder, sourcePath: candidate.sourcePath }));
+    const saved = await scanned.indexStore.load();
+    expect(saved).not.toBeNull();
+    const savedCandidates = saved!.skills['shared-skill'];
+    expect(savedCandidates).toHaveLength(2);
+    expect(savedCandidates.map((candidate) => ({
+      folder: candidate.folder,
+      sourcePath: candidate.sourcePath,
+    }))).toEqual(scannedCandidates);
+
+    const hydrated = makeRealDeps(folders, indexPath);
+    const scanSpy = vi.spyOn(hydrated.scanner, 'scan');
+    await ensureRegistryFresh(hydrated);
+
+    const hydratedWinner = hydrated.registry.get('shared-skill');
+    expect(scanSpy).not.toHaveBeenCalled();
+    expect(hydrated.registry.getCandidates('shared-skill').map((candidate) => ({
+      folder: candidate.folder,
+      sourcePath: candidate.sourcePath,
+    }))).toEqual(scannedCandidates);
+    expect(hydratedWinner?.folder).toBe(scannedWinner?.folder);
+    expect(hydratedWinner?.sourcePath).toBe(scannedWinner?.sourcePath);
+  });
+
   it('adding a skill file invalidates the index → next call rebuilds', async () => {
     const deps = makeRealDeps(folder, indexPath);
     await ensureRegistryFresh(deps);
@@ -154,6 +194,25 @@ describe('ensureRegistryFresh — persistent index end-to-end', () => {
 
     // Corrupt the on-disk index.
     await writeFile(indexPath, '{ broken json', 'utf8');
+
+    const deps2 = makeRealDeps(folder, indexPath);
+    const scanSpy2 = vi.spyOn(deps2.scanner, 'scan');
+    await expect(ensureRegistryFresh(deps2)).resolves.toBeUndefined();
+    expect(scanSpy2).toHaveBeenCalled();
+    expect(deps2.registry.size).toBe(2);
+  });
+
+  it('a corrupt candidate record degrades to a silent full rebuild', async () => {
+    const deps = makeRealDeps(folder, indexPath);
+    await ensureRegistryFresh(deps);
+    const valid = await deps.indexStore.load();
+    expect(valid).not.toBeNull();
+
+    await writeFile(indexPath, JSON.stringify({
+      version: valid!.version,
+      fingerprint: valid!.fingerprint,
+      skills: { 'skill-a': [{ sourcePath: 42 }] },
+    }), 'utf8');
 
     const deps2 = makeRealDeps(folder, indexPath);
     const scanSpy2 = vi.spyOn(deps2.scanner, 'scan');
