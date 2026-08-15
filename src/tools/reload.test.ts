@@ -66,6 +66,13 @@ function makeDeps(overrides: Partial<{
     resolver: new SkillResolver(),
     metadataCache: new SkillMetadataCache({ ttlMs: 300_000 }),
     contentCache: new SkillContentCache({ ttlMs: 300_000 }),
+    indexStore: {
+      load: vi.fn(async () => null),
+      save: vi.fn(async () => {}),
+      invalidate: vi.fn(async () => {}),
+      getPath: () => '/fake/registry-index.json',
+    } as unknown as ServerDeps['indexStore'],
+    indexEnabled: false,
     scanner: {
       scan: vi.fn(async (folder: string) => {
         if (scanErrors.has(folder)) throw scanErrors.get(folder)!;
@@ -291,7 +298,7 @@ describe('handleReload — error collection', () => {
 });
 
 describe('handleReload — folder validation', () => {
-  it('folder matching a configured folder → behaves like full reload (no throw)', async () => {
+  it('folder matching a configured folder returns partial scope', async () => {
     const folder = resolve('/skills');
     const contentA = makeContent('skill-a', folder);
     const deps = makeDeps({
@@ -303,7 +310,31 @@ describe('handleReload — folder validation', () => {
     await expect(handleReload(deps, { folder })).resolves.toMatchObject({
       loaded: 1,
       errors: [],
+      scope: { folder, scanned: 1 },
     });
+  });
+
+  it('scans only the requested configured folder', async () => {
+    const target = resolve('/target');
+    const other = resolve('/other');
+    const deps = makeDeps({
+      folders: [target, other],
+      scanResults: new Map([[target, []], [other, []]]),
+    });
+
+    await handleReload(deps, { folder: target });
+
+    expect(deps.scanner.scan).toHaveBeenCalledTimes(1);
+    expect(deps.scanner.scan).toHaveBeenCalledWith(target);
+  });
+
+  it('global reload keeps the legacy response shape without scope', async () => {
+    const deps = makeDeps({ scanResults: new Map([['/skills', []]]) });
+
+    const result = await handleReload(deps, {});
+
+    expect(result).toEqual({ loaded: 0, added: [], removed: [], errors: [] });
+    expect(result).not.toHaveProperty('scope');
   });
 
   it('folder NOT in configured folders → throws with reload: prefix', async () => {
@@ -338,5 +369,31 @@ describe('handleReload — cache state', () => {
     await handleReload(deps, {});
 
     expect(deps.metadataCache.isValid()).toBe(true);
+  });
+
+  it('partial reload invalidates affected content without clearing unrelated entries', async () => {
+    const target = resolve('/target');
+    const other = resolve('/other');
+    const targetContent = makeContent('target-skill', target);
+    const otherContent = makeContent('other-skill', other);
+    const deps = makeDeps({
+      folders: [target, other],
+      scanResults: new Map([
+        [target, [`${target}/target-skill.md`]],
+        [other, [`${other}/other-skill.md`]],
+      ]),
+      parseResults: new Map([
+        [`${target}/target-skill.md`, targetContent],
+        [`${other}/other-skill.md`, otherContent],
+      ]),
+    });
+    await handleReload(deps, {});
+    const changedTarget = { ...targetContent, body: 'changed', raw: 'changed' };
+    (deps.parser.tryParseFile as ReturnType<typeof vi.fn>).mockResolvedValue(changedTarget);
+
+    await handleReload(deps, { folder: target });
+
+    expect(deps.contentCache.get('target-skill')?.body).toBe('changed');
+    expect(deps.contentCache.get('other-skill')?.body).toBe('Body of other-skill');
   });
 });

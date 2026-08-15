@@ -55,7 +55,7 @@ async function buildIndexSnapshot(deps: ServerDeps): Promise<RegistryIndex> {
 
 /** Persist the current registry to the on-disk index. Best-effort: a write
  *  failure is logged but never aborts the rebuild. */
-async function persistIndex(deps: ServerDeps): Promise<void> {
+export async function persistIndex(deps: ServerDeps): Promise<void> {
   if (!deps.indexEnabled) return;
   try {
     const snapshot = await buildIndexSnapshot(deps);
