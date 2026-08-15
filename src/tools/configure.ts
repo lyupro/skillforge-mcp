@@ -44,6 +44,25 @@ export interface ConfigureResult {
    * informational hint — the folder is still registered. Absent otherwise.
    */
   conflictHint?: string;
+  /**
+   * Set on folder actions when SKILLFORGE_FOLDERS is supplying the active
+   * folder list. The write still lands in the config file, but it has no
+   * effect until the variable is gone — without saying so, the tool reports
+   * success while the caller watches nothing happen. Absent otherwise.
+   */
+  envOverrideNote?: string;
+}
+
+const ENV_OVERRIDE_NOTE =
+  'Saved to the config file, but the active folder list currently comes from the ' +
+  'SKILLFORGE_FOLDERS environment variable, which takes precedence, so this change has no ' +
+  'effect yet. Remove SKILLFORGE_FOLDERS from the SkillForge entry in your host config to ' +
+  'let the config file take over.';
+
+/** Folder actions only: the blacklist has no environment counterpart to lose to. */
+async function envOverrideNoteFor(deps: ServerDeps): Promise<{ envOverrideNote?: string }> {
+  const resolved = await loadResolvedConfig(process.env, deps.configStore);
+  return resolved.foldersSource === 'env' ? { envOverrideNote: ENV_OVERRIDE_NOTE } : {};
 }
 
 export async function handleConfigure(
@@ -59,6 +78,7 @@ export async function handleConfigure(
         folders: resolved.folders,
         blacklist: resolved.persisted.blacklist,
         totalSkills: deps.registry.size,
+        ...(resolved.foldersSource === 'env' ? { envOverrideNote: ENV_OVERRIDE_NOTE } : {}),
       };
     }
 
@@ -107,6 +127,7 @@ export async function handleConfigure(
         blacklist: finalPersisted.blacklist,
         totalSkills: deps.registry.size,
         ...(conflict !== null ? { conflictHint: formatConflictHint(conflict) } : {}),
+        ...(await envOverrideNoteFor(deps)),
       };
     }
 
@@ -123,6 +144,7 @@ export async function handleConfigure(
         folders: [...deps.folders],
         blacklist: finalPersisted.blacklist,
         totalSkills: deps.registry.size,
+        ...(await envOverrideNoteFor(deps)),
       };
     }
 
@@ -149,6 +171,7 @@ export async function handleConfigure(
         folders: [...deps.folders],
         blacklist: finalPersisted.blacklist,
         totalSkills: deps.registry.size,
+        ...(await envOverrideNoteFor(deps)),
       };
     }
 

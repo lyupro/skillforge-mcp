@@ -12,6 +12,8 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: [
         'src/**/*.test.ts',
+        // Fakes that exist only to drive tests; measuring them measures nothing.
+        'src/**/*-test-harness.ts',
         'src/**/*.d.ts',
         'src/server.ts',
         'src/core/types.ts',

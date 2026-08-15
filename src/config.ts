@@ -6,6 +6,7 @@ import {
   resolveSetting,
   type ResolvedSetting,
   type SettingConflict,
+  type SettingSource,
 } from './config/settings-resolver.js';
 import {
   contentTtlDeclaration,
@@ -37,6 +38,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SkillForgeConf
 export interface ResolvedConfig {
   /** Folders ultimately used by the server (env override > persisted folders > built-in default). */
   folders: string[];
+  /** Where the folder list above came from. The list itself cannot carry this:
+   *  env and config describe folders in different shapes, so they are merged by
+   *  hand rather than by the resolver, and callers still need to know who won. */
+  foldersSource: SettingSource;
   metadataTtlMs: ResolvedSetting<number>;
   contentTtlMs: ResolvedSetting<number>;
   logLevel: ResolvedSetting<LogLevel>;
@@ -60,16 +65,20 @@ export async function loadResolvedConfig(
   const defaultFolder = join(homedir(), '.claude', 'plugins', 'cache', 'claude-code-skills');
 
   let folders: string[];
+  let foldersSource: SettingSource;
   if (envFolders.length > 0) {
     folders = envFolders;
+    foldersSource = 'env';
   } else {
     const enabled = persisted.folders.filter((f) => f.enabled);
     if (enabled.length > 0) {
       // Sort by priority descending; stable for ties (Array.sort is stable in V8).
       const sorted = [...enabled].sort((a, b) => b.priority - a.priority);
       folders = sorted.map((f) => resolve(f.path));
+      foldersSource = 'config';
     } else {
       folders = [defaultFolder];
+      foldersSource = 'default';
     }
   }
 
@@ -79,6 +88,7 @@ export async function loadResolvedConfig(
 
   return {
     folders,
+    foldersSource,
     metadataTtlMs,
     contentTtlMs,
     logLevel,
