@@ -34,6 +34,7 @@ import { main as securityMain } from './security.js';
 import { main as versionPolicyMain } from './version-policy.js';
 import { main as skillsMain } from './skills.js';
 import { main as updateMain } from './update.js';
+import { main as configMain } from './config.js';
 
 const USAGE = `skillforge-mcp — universal Skills MCP server + install CLI.
 
@@ -71,6 +72,10 @@ Commands:
                to pin a bundle against newer installs.
                Run "skillforge-mcp version-policy" for sub-action usage.
                  Example: skillforge-mcp version-policy set engineering-advanced-skills 2.4.4
+  config       Show which setting is in force and where it came from
+               (environment > config file > built-in default), plus the path of
+               the config file itself. Pass --json for machine-readable output.
+                 Example: skillforge-mcp config
   skills       View and reload skills from the terminal
                (list/get/reload/reindex). The CLI reads disk, not a live
                server session.
@@ -201,6 +206,9 @@ export async function main(
   }
   if (first === 'skills') {
     return skillsMain(rawArgv.slice(1));
+  }
+  if (first === 'config') {
+    return configMain(rawArgv.slice(1));
   }
   if (first === 'update' || first === 'upgrade') {
     return updateMain(rawArgv.slice(1));
