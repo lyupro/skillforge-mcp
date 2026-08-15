@@ -152,9 +152,9 @@ describe('loadResolvedConfig', () => {
       { SKILLFORGE_TTL_MS: '300000' },
       fakeStore(persisted) as never,
     );
-    expect(resolved.metadataTtlMs.source).toBe('config');
+    expect(resolved.metadataTtlMs.source).toBe('env');
     expect(formatSettingConflict(resolved.metadataTtlMs.conflict!)).toBe(
-      'metadataTtlMs: config value 60000 wins over SKILLFORGE_TTL_MS=300000',
+      'metadataTtlMs: SKILLFORGE_TTL_MS=300000 wins over config value 60000',
     );
   });
 

@@ -64,27 +64,32 @@ export function resolveSetting<T>(
   const envValue = environment[declaration.envKey];
   const hasEnvValue = envValue !== undefined && envValue !== '';
 
-  if (configValue !== undefined) {
-    const value = parseValue(declaration, settingKey, 'config', configValue);
-    return hasEnvValue
-      ? {
+  // Parsed up front even when the environment wins: a malformed config key is
+  // an error whoever ends up supplying the value. Boxed so that `undefined`
+  // means "the key is absent" rather than "the key parsed to undefined".
+  const parsedConfig: { value: T } | undefined =
+    configValue !== undefined
+      ? { value: parseValue(declaration, settingKey, 'config', configValue) }
+      : undefined;
+
+  if (hasEnvValue) {
+    const value = parseValue(declaration, settingKey, 'env', envValue);
+    return parsedConfig === undefined
+      ? { value, source: 'env' }
+      : {
           value,
-          source: 'config',
+          source: 'env',
           conflict: {
             settingKey,
-            configValue: value,
+            configValue: parsedConfig.value,
             envKey: declaration.envKey,
             envValue,
           },
-        }
-      : { value, source: 'config' };
+        };
   }
 
-  if (hasEnvValue) {
-    return {
-      value: parseValue(declaration, settingKey, 'env', envValue),
-      source: 'env',
-    };
+  if (parsedConfig !== undefined) {
+    return { value: parsedConfig.value, source: 'config' };
   }
 
   return { value: declaration.defaultValue, source: 'default' };

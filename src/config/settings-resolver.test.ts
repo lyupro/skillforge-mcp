@@ -97,14 +97,14 @@ describe.each(parserCases)('$label parser and resolution', (parserCase) => {
     });
   });
 
-  it('lets config win and reports both conflicting source values', () => {
+  it('lets environment win and reports both conflicting source values', () => {
     const config = nestedConfig(declaration.configPath, parserCase.configValue);
     const result = resolveSetting(declaration, config, {
       [declaration.envKey]: parserCase.envValue,
     });
     expect(result).toEqual({
-      value: parserCase.configValue,
-      source: 'config',
+      value: declaration.parser.parse(parserCase.envValue),
+      source: 'env',
       conflict: {
         settingKey: declaration.configPath.at(-1),
         configValue: parserCase.configValue,
@@ -114,7 +114,15 @@ describe.each(parserCases)('$label parser and resolution', (parserCase) => {
     });
   });
 
-  it('treats an empty environment string as unset', () => {
+  it('treats an empty environment string as unset when config is set', () => {
+    const config = nestedConfig(declaration.configPath, parserCase.configValue);
+    expect(resolveSetting(declaration, config, { [declaration.envKey]: '' })).toEqual({
+      value: parserCase.configValue,
+      source: 'config',
+    });
+  });
+
+  it('treats an empty environment string as unset when config is absent', () => {
     expect(resolveSetting(declaration, {}, { [declaration.envKey]: '' })).toEqual({
       value: parserCase.defaultValue,
       source: 'default',
@@ -169,14 +177,19 @@ describe('invalid values', () => {
     ).toThrow(/enabled.*config.*yes.*true or false/);
   });
 
-  it('does not validate a losing environment value', () => {
+  it('fails loud for an invalid losing config value', () => {
     const declaration = parserCases[0]!.declaration;
-    const config = nestedConfig(declaration.configPath, 60_000);
-    expect(resolveSetting(declaration, config, { SKILLFORGE_TTL_MS: 'garbage' })).toMatchObject({
-      value: 60_000,
-      source: 'config',
-      conflict: { envValue: 'garbage' },
-    });
+    const config = nestedConfig(declaration.configPath, 'garbage');
+
+    let thrown: unknown;
+    try {
+      resolveSetting(declaration, config, { SKILLFORGE_TTL_MS: '60000' });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(SettingResolutionError);
+    expect((thrown as SettingResolutionError).source).toBe('config');
   });
 
   it('accepts an empty persisted string list', () => {

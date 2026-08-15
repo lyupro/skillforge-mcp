@@ -111,7 +111,7 @@ export async function loadResolvedConfig(
 }
 
 export function formatSettingConflict(conflict: SettingConflict<number>): string {
-  return `${conflict.settingKey}: config value ${conflict.configValue} wins over ${conflict.envKey}=${conflict.envValue}`;
+  return `${conflict.settingKey}: ${conflict.envKey}=${conflict.envValue} wins over config value ${conflict.configValue}`;
 }
 
 /** Build a PatternScanner from persisted security settings, or null if auto-audit is off
