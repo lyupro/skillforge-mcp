@@ -11,7 +11,7 @@ import {
 
 interface ParserCase<T> {
   label: string;
-  declaration: SettingDeclaration<T>;
+  declaration: SettingDeclaration<T> & { envKey: string; configPath: readonly string[] };
   envValue: string;
   configValue: T;
   defaultValue: T;
@@ -21,6 +21,7 @@ const parserCases: ParserCase<unknown>[] = [
   {
     label: 'bounded integer',
     declaration: {
+      settingKey: 'metadataTtlMs',
       envKey: 'SKILLFORGE_TTL_MS',
       configPath: ['cache', 'metadataTtlMs'],
       parser: integerAtLeast(0),
@@ -34,6 +35,7 @@ const parserCases: ParserCase<unknown>[] = [
   {
     label: 'boolean',
     declaration: {
+      settingKey: 'enabled',
       envKey: 'SKILLFORGE_WATCHER',
       configPath: ['watcher', 'enabled'],
       parser: booleanParser,
@@ -47,6 +49,7 @@ const parserCases: ParserCase<unknown>[] = [
   {
     label: 'non-empty string',
     declaration: {
+      settingKey: 'indexPath',
       envKey: 'SKILLFORGE_INDEX_PATH',
       configPath: ['cache', 'indexPath'],
       parser: nonEmptyStringParser,
@@ -60,6 +63,7 @@ const parserCases: ParserCase<unknown>[] = [
   {
     label: 'delimited string list',
     declaration: {
+      settingKey: 'tags',
       envKey: 'SKILLFORGE_TAGS',
       configPath: ['tags'],
       parser: stringListParser(','),
@@ -106,7 +110,7 @@ describe.each(parserCases)('$label parser and resolution', (parserCase) => {
       value: declaration.parser.parse(parserCase.envValue),
       source: 'env',
       conflict: {
-        settingKey: declaration.configPath.at(-1),
+        settingKey: declaration.settingKey,
         configValue: parserCase.configValue,
         envKey: declaration.envKey,
         envValue: parserCase.envValue,
@@ -161,7 +165,7 @@ describe('invalid values', () => {
       thrown = error;
     }
 
-    const settingKey = declaration.configPath.at(-1)!;
+    const settingKey = declaration.settingKey;
     expect(thrown).toBeInstanceOf(SettingResolutionError);
     expect((thrown as Error).message).toContain(settingKey);
     expect((thrown as Error).message).toContain('env');
@@ -225,6 +229,147 @@ describe('integer boundaries and presence semantics', () => {
       value: 300_000,
       source: 'default',
     });
+  });
+});
+
+describe('env-only declarations', () => {
+  const declaration: SettingDeclaration<number> = {
+    settingKey: 'workerCount',
+    envKey: 'SKILLFORGE_WORKERS',
+    parser: integerAtLeast(1),
+    defaultValue: 2,
+    expected: 'a positive integer',
+  };
+
+  it('uses env when it is set', () => {
+    expect(resolveSetting(declaration, {}, { SKILLFORGE_WORKERS: '4' })).toEqual({
+      value: 4,
+      source: 'env',
+    });
+  });
+
+  it('uses default when env is absent', () => {
+    expect(resolveSetting(declaration, {}, {})).toEqual({ value: 2, source: 'default' });
+  });
+
+  it('ignores a same-named config key without producing a conflict', () => {
+    expect(resolveSetting(declaration, { workerCount: 8 }, {})).toEqual({
+      value: 2,
+      source: 'default',
+    });
+  });
+});
+
+describe('multiple environment names', () => {
+  const declaration: SettingDeclaration<number> = {
+    settingKey: 'timeoutMs',
+    envKey: ['PRIMARY_TIMEOUT', 'LEGACY_TIMEOUT'],
+    configPath: ['timeoutMs'],
+    parser: integerAtLeast(0),
+    defaultValue: 100,
+    expected: 'a non-negative integer',
+  };
+
+  it('uses the second name and reports it in a conflict when only it is set', () => {
+    expect(resolveSetting(declaration, { timeoutMs: 200 }, { LEGACY_TIMEOUT: '300' })).toEqual({
+      value: 300,
+      source: 'env',
+      conflict: {
+        settingKey: 'timeoutMs',
+        configValue: 200,
+        envKey: 'LEGACY_TIMEOUT',
+        envValue: '300',
+      },
+    });
+  });
+
+  it('uses the first non-empty name', () => {
+    expect(
+      resolveSetting(declaration, {}, { PRIMARY_TIMEOUT: '200', LEGACY_TIMEOUT: '300' }),
+    ).toEqual({ value: 200, source: 'env' });
+    expect(
+      resolveSetting(declaration, {}, { PRIMARY_TIMEOUT: '', LEGACY_TIMEOUT: '300' }),
+    ).toEqual({ value: 300, source: 'env' });
+  });
+
+  it('names the active second key when its value is invalid', () => {
+    expect(() =>
+      resolveSetting(declaration, {}, { PRIMARY_TIMEOUT: '', LEGACY_TIMEOUT: 'invalid' }),
+    ).toThrow(/timeoutMs.*env.*invalid.*LEGACY_TIMEOUT/);
+
+    try {
+      resolveSetting(declaration, {}, { PRIMARY_TIMEOUT: '', LEGACY_TIMEOUT: 'invalid' });
+    } catch (error) {
+      expect(error).toBeInstanceOf(SettingResolutionError);
+      expect((error as SettingResolutionError).source).toBe('env');
+    }
+  });
+});
+
+describe('declared setting key', () => {
+  const declaration: SettingDeclaration<number> = {
+    settingKey: 'publicName',
+    envKey: 'PUBLIC_NAME',
+    configPath: ['internalName'],
+    parser: integerAtLeast(0),
+    defaultValue: 0,
+    expected: 'a non-negative integer',
+  };
+
+  it('uses the declared key in errors and conflicts', () => {
+    expect(() => resolveSetting(declaration, {}, { PUBLIC_NAME: 'invalid' })).toThrow(
+      /publicName/,
+    );
+    expect(resolveSetting(declaration, { internalName: 1 }, { PUBLIC_NAME: '2' })).toMatchObject({
+      conflict: { settingKey: 'publicName' },
+    });
+  });
+});
+
+describe('environment unset predicate', () => {
+  const declaration: SettingDeclaration<boolean> = {
+    settingKey: 'debug',
+    envKey: 'SKILLFORGE_DEBUG',
+    configPath: ['debug'],
+    isEnvValueUnset: (value) => value === '0' || value === 'ignored-invalid',
+    parser: booleanParser,
+    defaultValue: false,
+    expected: 'true or false',
+  };
+
+  it('falls through to config without a conflict when the predicate returns true', () => {
+    expect(resolveSetting(declaration, { debug: true }, { SKILLFORGE_DEBUG: '0' })).toEqual({
+      value: true,
+      source: 'config',
+    });
+  });
+
+  it('falls through to default when the predicate returns true and config is absent', () => {
+    expect(resolveSetting(declaration, {}, { SKILLFORGE_DEBUG: '0' })).toEqual({
+      value: false,
+      source: 'default',
+    });
+  });
+
+  it('uses the normal parser path when the predicate returns false', () => {
+    expect(resolveSetting(declaration, {}, { SKILLFORGE_DEBUG: 'true' })).toEqual({
+      value: true,
+      source: 'env',
+    });
+  });
+
+  it('calls the predicate before parsing', () => {
+    expect(resolveSetting(declaration, {}, { SKILLFORGE_DEBUG: 'ignored-invalid' })).toEqual({
+      value: false,
+      source: 'default',
+    });
+  });
+
+  it('preserves normal parsing when no predicate is declared', () => {
+    const { isEnvValueUnset: _unused, ...withoutPredicate } = declaration;
+    expect(() =>
+      resolveSetting(withoutPredicate, {}, { SKILLFORGE_DEBUG: 'ignored-invalid' }),
+    ).toThrow(SettingResolutionError);
   });
 });
 

@@ -21,6 +21,7 @@ export interface SkillForgeConfig {
 const DEFAULT_TTL_MS = 300_000;
 
 const metadataTtlDeclaration = {
+  settingKey: 'metadataTtlMs',
   envKey: 'SKILLFORGE_TTL_MS',
   configPath: ['cache', 'metadataTtlMs'],
   parser: integerAtLeast(0),
@@ -29,6 +30,7 @@ const metadataTtlDeclaration = {
 } satisfies SettingDeclaration<number>;
 
 const contentTtlDeclaration = {
+  settingKey: 'contentTtlMs',
   envKey: 'SKILLFORGE_TTL_MS',
   configPath: ['cache', 'contentTtlMs'],
   parser: integerAtLeast(0),

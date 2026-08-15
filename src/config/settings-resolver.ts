@@ -5,8 +5,10 @@ export interface SettingParser<T> {
 }
 
 export interface SettingDeclaration<T> {
-  envKey: string;
-  configPath: readonly string[];
+  settingKey: string;
+  envKey: string | readonly string[];
+  configPath?: readonly string[];
+  isEnvValueUnset?: (value: string) => boolean;
   parser: SettingParser<T>;
   defaultValue: T;
   expected: string;
@@ -30,16 +32,19 @@ export class SettingResolutionError extends Error {
   readonly source: Exclude<SettingSource, 'default'>;
   readonly received: unknown;
   readonly expected: string;
+  /** Which environment name carried the bad value — a setting may declare several. */
+  readonly envKey: string | undefined;
 
   constructor(
     settingKey: string,
     source: Exclude<SettingSource, 'default'>,
     received: unknown,
     expected: string,
-    options?: ErrorOptions,
+    options?: ErrorOptions & { envKey?: string },
   ) {
+    const envSuffix = options?.envKey === undefined ? '' : `; environment key ${options.envKey}`;
     super(
-      `Invalid setting ${settingKey} from ${source}: received ${formatReceived(received)}; expected ${expected}`,
+      `Invalid setting ${settingKey} from ${source}: received ${formatReceived(received)}; expected ${expected}${envSuffix}`,
       options,
     );
     this.name = 'SettingResolutionError';
@@ -47,6 +52,7 @@ export class SettingResolutionError extends Error {
     this.source = source;
     this.received = received;
     this.expected = expected;
+    this.envKey = options?.envKey;
   }
 }
 
@@ -55,14 +61,26 @@ export function resolveSetting<T>(
   persistedConfig: unknown,
   environment: Readonly<Record<string, string | undefined>>,
 ): ResolvedSetting<T> {
-  const settingKey = declaration.configPath.at(-1);
-  if (settingKey === undefined) {
-    throw new Error('Setting configPath must contain at least one key');
+  const { settingKey } = declaration;
+  if (declaration.configPath?.length === 0) {
+    throw new Error('Setting configPath must contain at least one key when provided');
   }
-
-  const configValue = readConfigValue(persistedConfig, declaration.configPath);
-  const envValue = environment[declaration.envKey];
-  const hasEnvValue = envValue !== undefined && envValue !== '';
+  const configValue =
+    declaration.configPath === undefined
+      ? undefined
+      : readConfigValue(persistedConfig, declaration.configPath);
+  const envKeys =
+    typeof declaration.envKey === 'string' ? [declaration.envKey] : declaration.envKey;
+  const selectedEnv = envKeys
+    .map((envKey) => ({ envKey, envValue: environment[envKey] }))
+    .find(
+      (candidate): candidate is { envKey: string; envValue: string } =>
+        candidate.envValue !== undefined && candidate.envValue !== '',
+    );
+  const activeEnv =
+    selectedEnv !== undefined && declaration.isEnvValueUnset?.(selectedEnv.envValue) !== true
+      ? selectedEnv
+      : undefined;
 
   // Parsed up front even when the environment wins: a malformed config key is
   // an error whoever ends up supplying the value. Boxed so that `undefined`
@@ -72,8 +90,14 @@ export function resolveSetting<T>(
       ? { value: parseValue(declaration, settingKey, 'config', configValue) }
       : undefined;
 
-  if (hasEnvValue) {
-    const value = parseValue(declaration, settingKey, 'env', envValue);
+  if (activeEnv !== undefined) {
+    const value = parseValue(
+      declaration,
+      settingKey,
+      'env',
+      activeEnv.envValue,
+      activeEnv.envKey,
+    );
     return parsedConfig === undefined
       ? { value, source: 'env' }
       : {
@@ -82,8 +106,8 @@ export function resolveSetting<T>(
           conflict: {
             settingKey,
             configValue: parsedConfig.value,
-            envKey: declaration.envKey,
-            envValue,
+            envKey: activeEnv.envKey,
+            envValue: activeEnv.envValue,
           },
         };
   }
@@ -154,12 +178,14 @@ function parseValue<T>(
   settingKey: string,
   source: Exclude<SettingSource, 'default'>,
   received: unknown,
+  envKey?: string,
 ): T {
   try {
     return declaration.parser.parse(received);
   } catch (error) {
     throw new SettingResolutionError(settingKey, source, received, declaration.expected, {
       cause: error,
+      ...(envKey === undefined ? {} : { envKey }),
     });
   }
 }
