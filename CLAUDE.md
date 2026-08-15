@@ -68,7 +68,7 @@ pnpm test:watch         # vitest in watch mode
 pnpm test:coverage      # coverage with 80% gate
 pnpm lint               # tsc --noEmit (type-check)
 pnpm check:size         # file-size gate (<=400 lines)
-pnpm build              # emit dist/ (tsc -p tsconfig.json)
+pnpm build              # clean dist/ then emit it (scripts/clean-dist.mjs + tsc -p tsconfig.json)
 pnpm smoke              # subprocess smoke test against dist/cli/dispatcher.js
 ```
 
@@ -77,7 +77,7 @@ pnpm smoke              # subprocess smoke test against dist/cli/dispatcher.js
 After meaningful changes:
 
 1. `pnpm lint` — type-check passes.
-2. `pnpm test` — all tests pass (currently 901 + 2 skipped, including in-process integration via InMemoryTransport covering composite invocation, cycle detection, and the real-frontmatter promotion path for `scripts:` / `cacheable:` / `cacheTtlMs:`).
+2. `pnpm test` — all tests pass (currently 1146 + 2 skipped, including in-process integration via InMemoryTransport covering composite invocation, cycle detection, and the real-frontmatter promotion path for `scripts:` / `cacheable:` / `cacheTtlMs:`).
 3. `pnpm check:size` — no file over 400 lines.
 4. For MCP-protocol or `src/server.ts` / `src/tools/` changes: `pnpm build && pnpm smoke` — spawns the actual `dist/cli/dispatcher.js serve` entry point and exercises all three tools via a real `StdioClientTransport`. This catches build / module-resolution / shebang issues that the in-process integration test cannot.
 
@@ -109,7 +109,7 @@ After updating, commit the docs together with the code (Definition of Done = cod
 - Parent-project pipeline integration happens in the parent project's repo. This repo stays MCP-only.
 - Marketplace catalog lives in the sibling `llm-plugins-marketplace/` repo (scaffolded locally, separate git history). Listing entry already populated; push to GitHub is operator-side.
 - Marketing surface — launch copy (Twitter / LinkedIn / Reddit / Show HN drafts) lives at `marketing/copy/`. The landing-page HTML moved to the brand-site repo `lyupro/lyupro-site` (`pages/tools/skillforge/`); it deploys to `lyupro.com/tools/skillforge` and fetches its changelog live from this repo. Social posting + landing deploy are operator-side.
-- npm publish + GitHub release — fully prepped (CHANGELOG.md, RELEASE_NOTES.md, package.json files whitelist, `prepublishOnly: pnpm build`, `npm pack --dry-run` verified at 183 KB / 375 entries). Runbook in [`docs/PUBLISHING.md`](./docs/PUBLISHING.md). Execution requires npm credentials + `npm publish --access public` operator-side.
+- npm publish + GitHub release — fully prepped (CHANGELOG.md, RELEASE_NOTES.md, package.json files whitelist, `prepublishOnly: pnpm build`, `npm pack --dry-run` verified at 219 KB / 407 entries for 1.15.0). Runbook in [`docs/PUBLISHING.md`](./docs/PUBLISHING.md). Execution requires npm credentials + `npm publish --access public` operator-side.
 
 ## Language
 
