@@ -10,8 +10,8 @@ export class SkillMetadataCache {
 
   constructor(options?: MetadataCacheOptions) {
     const ttlMs = options?.ttlMs ?? 300_000;
-    if (ttlMs <= 0) {
-      throw new Error('ttlMs must be a positive number');
+    if (ttlMs < 0) {
+      throw new Error('ttlMs must be zero (cache disabled) or a positive number');
     }
     this.#ttlMs = ttlMs;
     this.#now = options?.now ?? Date.now;
@@ -22,6 +22,7 @@ export class SkillMetadataCache {
   }
 
   markFresh(): void {
+    if (this.#ttlMs === 0) return;
     this.#freshAt = this.#now();
   }
 

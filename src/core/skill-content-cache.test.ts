@@ -92,9 +92,22 @@ describe('SkillContentCache', () => {
     expect(cache.get('c')).toBeDefined();
   });
 
-  it('constructor rejects ttlMs <= 0', () => {
-    expect(() => new SkillContentCache({ ttlMs: 0 })).toThrow();
-    expect(() => new SkillContentCache({ ttlMs: -5 })).toThrow();
+  it('constructor accepts ttlMs 0', () => {
+    expect(() => new SkillContentCache({ ttlMs: 0 })).not.toThrow();
+  });
+
+  it('ttlMs 0 disables the cache without storing content', () => {
+    const cache = new SkillContentCache({ ttlMs: 0 });
+    expect(cache.ttlMs).toBe(0);
+    cache.set('foo', makeContent('foo'));
+    expect(cache.get('foo')).toBeUndefined();
+    expect(cache.size).toBe(0);
+  });
+
+  it('constructor rejects negative ttlMs', () => {
+    expect(() => new SkillContentCache({ ttlMs: -5 })).toThrow(
+      'ttlMs must be zero (cache disabled) or a positive number',
+    );
   });
 
   it('constructor rejects maxEntries <= 0', () => {

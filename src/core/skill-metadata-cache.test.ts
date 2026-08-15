@@ -57,8 +57,21 @@ describe('SkillMetadataCache', () => {
     expect(cache.isValid()).toBe(false);
   });
 
-  it('constructor rejects ttlMs <= 0', () => {
-    expect(() => new SkillMetadataCache({ ttlMs: 0 })).toThrow();
-    expect(() => new SkillMetadataCache({ ttlMs: -1 })).toThrow();
+  it('constructor accepts ttlMs 0', () => {
+    expect(() => new SkillMetadataCache({ ttlMs: 0 })).not.toThrow();
+  });
+
+  it('ttlMs 0 disables the cache without storing freshness', () => {
+    const cache = new SkillMetadataCache({ ttlMs: 0 });
+    expect(cache.ttlMs).toBe(0);
+    cache.markFresh();
+    expect(cache.isValid()).toBe(false);
+    expect(cache.expiresAt()).toBeNull();
+  });
+
+  it('constructor rejects negative ttlMs', () => {
+    expect(() => new SkillMetadataCache({ ttlMs: -1 })).toThrow(
+      'ttlMs must be zero (cache disabled) or a positive number',
+    );
   });
 });

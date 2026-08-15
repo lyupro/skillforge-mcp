@@ -21,8 +21,8 @@ export class SkillContentCache {
   constructor(options?: ContentCacheOptions) {
     const ttlMs = options?.ttlMs ?? 300_000;
     const maxEntries = options?.maxEntries ?? 256;
-    if (ttlMs <= 0) {
-      throw new Error('ttlMs must be a positive number');
+    if (ttlMs < 0) {
+      throw new Error('ttlMs must be zero (cache disabled) or a positive number');
     }
     if (maxEntries <= 0) {
       throw new Error('maxEntries must be a positive number');
@@ -44,6 +44,7 @@ export class SkillContentCache {
   }
 
   set(name: string, content: SkillContent): void {
+    if (this.#ttlMs === 0) return;
     // Move existing key to end (most-recently-used) by removing before re-inserting.
     if (this.#store.has(name)) {
       this.#store.delete(name);
