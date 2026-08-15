@@ -71,7 +71,7 @@ const TOOL_REFS: ToolRef[] = [
         name: 'action',
         type: "'add_folder' | 'remove_folder' | 'list_folders' | 'set_blacklist' | 'get_blacklist' | 'reset'",
         required: true,
-        note: 'Which configuration action to run.',
+        note: 'Which configuration action to run; folder actions warn when SKILLFORGE_FOLDERS overrides the result.',
       },
       { name: 'folder', type: 'string', required: false, note: 'Folder path — required by add_folder / remove_folder.' },
       {
@@ -96,7 +96,7 @@ const TOOL_REFS: ToolRef[] = [
         name: 'folder',
         type: 'string',
         required: false,
-        note: 'Validate this folder is configured before the full rescan.',
+        note: 'Rescan only this configured folder; the response adds scope { folder, scanned } while diff fields remain global.',
       },
     ],
     example: '{}',

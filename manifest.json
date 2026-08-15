@@ -53,20 +53,32 @@
     },
     {
       "name": "skills__configure",
-      "description": "Manage configured skill folders, blacklist, and reset to defaults. Actions: add_folder (optionally with a kebab-case alias), remove_folder, list_folders, set_blacklist, get_blacklist, reset. Persists to the platform config path."
+      "description": "Manage configured skill folders, blacklist, and reset to defaults. Actions: add_folder (optionally with a kebab-case alias), remove_folder, list_folders, set_blacklist, get_blacklist, reset. Persists to the platform config path; folder actions return an envOverrideNote when SKILLFORGE_FOLDERS overrides the result."
     },
     {
       "name": "skills__reload",
-      "description": "Force a full rescan of all configured folders. Returns { loaded, added, removed, errors } diff against the previous registry snapshot."
+      "description": "Force a full rescan of all configured folders, or pass optional folder to rescan one configured folder. Returns the global { loaded, added, removed, errors } diff; partial reloads also return scope { folder, scanned }, and an unconfigured folder is an error."
     }
   ],
   "environment": {
     "SKILLFORGE_FOLDERS": {
-      "description": "Override folder list (path-separator: ':' POSIX, ';' Windows). When set, overrides persisted folders[] entirely.",
+      "description": "Folder list (path-separator: ':' POSIX, ';' Windows). Resolution order: environment > config file > default; when set, it replaces persisted folders[] entirely.",
       "required": false
     },
     "SKILLFORGE_TTL_MS": {
-      "description": "Metadata cache TTL in ms. Default 300000 (5 min).",
+      "description": "Sets both metadataTtlMs and contentTtlMs cache TTLs in ms. Default 300000 (5 min); 0 disables caching, and an invalid value prevents startup.",
+      "required": false
+    },
+    "SKILLFORGE_DEBUG": {
+      "description": "Set the logging level; a falsy value defers to the config file, then the default.",
+      "required": false
+    },
+    "DEBUG": {
+      "description": "Set the logging level; a falsy value defers to the config file, then the default.",
+      "required": false
+    },
+    "HERMES_HOME": {
+      "description": "Hermes home directory. Default ~/.hermes.",
       "required": false
     }
   },
