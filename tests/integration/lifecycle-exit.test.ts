@@ -2,7 +2,12 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:chil
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// Spawns real processes / boots a real server, so it is not bound by the 5s
+// default meant for pure unit tests: on a busy machine that budget expires
+// mid-setup and reports a timeout where nothing is actually broken.
+vi.setConfig({ testTimeout: 20_000 });
 
 const root = resolve(import.meta.dirname, '..', '..');
 const dispatcher = resolve(root, 'dist', 'cli', 'dispatcher.js');

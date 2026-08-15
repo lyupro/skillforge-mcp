@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Spawns real processes / boots a real server, so it is not bound by the 5s
+// default meant for pure unit tests: on a busy machine that budget expires
+// mid-setup and reports a timeout where nothing is actually broken.
+vi.setConfig({ testTimeout: 20_000 });
 import { mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
