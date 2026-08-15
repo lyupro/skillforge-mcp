@@ -69,6 +69,24 @@ describe('paths', () => {
     }
   });
 
+  it('hermesConfigPath falls back when HERMES_HOME is empty', async () => {
+    const { hermesConfigPath } = await import('./paths.js');
+    const { homedir } = await import('node:os');
+    const { join } = await import('node:path');
+    expect(hermesConfigPath({ HERMES_HOME: '' })).toBe(
+      join(homedir(), '.hermes', 'config.yaml'),
+    );
+  });
+
+  it('hermesConfigPath falls back when HERMES_HOME contains only whitespace', async () => {
+    const { hermesConfigPath } = await import('./paths.js');
+    const { homedir } = await import('node:os');
+    const { join } = await import('node:path');
+    expect(hermesConfigPath({ HERMES_HOME: '   ' })).toBe(
+      join(homedir(), '.hermes', 'config.yaml'),
+    );
+  });
+
   it('defaultBinaryPath ends with dist/cli/dispatcher.js', async () => {
     const { defaultBinaryPath } = await import('./paths.js');
     const p = defaultBinaryPath().replace(/\\/g, '/');

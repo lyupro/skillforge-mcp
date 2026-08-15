@@ -10,6 +10,8 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { statSync } from 'node:fs';
+import { hermesHomeDeclaration } from '../config/settings-declarations.js';
+import { resolveSetting } from '../config/settings-resolver.js';
 
 export interface PathOverrides {
   claudeConfigPath: string;
@@ -48,12 +50,9 @@ export function cursorConfigPath(): string {
 // environment variable when set (Hermes profiles / non-standard home);
 // otherwise it falls back to ~/.hermes/config.yaml. MCP servers live under
 // the top-level `mcp_servers` key — distinct from the `mcp:` provider key.
-export function hermesConfigPath(): string {
-  const home = process.env.HERMES_HOME;
-  if (home !== undefined && home.trim() !== '') {
-    return join(home, 'config.yaml');
-  }
-  return join(homedir(), '.hermes', 'config.yaml');
+export function hermesConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+  const home = resolveSetting(hermesHomeDeclaration, {}, env).value;
+  return join(home, 'config.yaml');
 }
 
 // Fallback `--entry local` target when --binary-path is not supplied.

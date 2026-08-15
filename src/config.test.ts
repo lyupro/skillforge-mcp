@@ -43,6 +43,24 @@ describe('loadConfig', () => {
     expect(config.folders).toEqual([resolve('/trimmed')]);
   });
 
+  it('ignores an empty segment between folder entries', () => {
+    const raw = ['/first', '', '/second'].join(delimiter);
+    const config = loadConfig({ SKILLFORGE_FOLDERS: raw });
+    expect(config.folders).toEqual([resolve('/first'), resolve('/second')]);
+  });
+
+  it('fails loud when SKILLFORGE_FOLDERS contains only delimiters', () => {
+    expect(() => loadConfig({ SKILLFORGE_FOLDERS: delimiter.repeat(3) })).toThrow(
+      SettingResolutionError,
+    );
+  });
+
+  it('treats an empty SKILLFORGE_FOLDERS value as unset', () => {
+    const config = loadConfig({ SKILLFORGE_FOLDERS: '' });
+    const expected = join(homedir(), '.claude', 'plugins', 'cache', 'claude-code-skills');
+    expect(config.folders).toEqual([expected]);
+  });
+
   it('returns default TTL when SKILLFORGE_TTL_MS is not set', () => {
     const config = loadConfig({});
     expect(config.ttlMs).toBe(300_000);

@@ -1,14 +1,17 @@
-import { delimiter, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { ConfigStore, defaultConfigPath } from './config/index.js';
 import type { PersistedConfig } from './config/index.js';
 import {
-  integerAtLeast,
   resolveSetting,
   type ResolvedSetting,
   type SettingConflict,
-  type SettingDeclaration,
 } from './config/settings-resolver.js';
+import {
+  contentTtlDeclaration,
+  foldersDeclaration,
+  metadataTtlDeclaration,
+} from './config/settings-declarations.js';
 import { PatternScanner } from './security/index.js';
 
 export interface SkillForgeConfig {
@@ -18,41 +21,8 @@ export interface SkillForgeConfig {
   ttlMs: number;
 }
 
-const DEFAULT_TTL_MS = 300_000;
-
-const metadataTtlDeclaration = {
-  settingKey: 'metadataTtlMs',
-  envKey: 'SKILLFORGE_TTL_MS',
-  configPath: ['cache', 'metadataTtlMs'],
-  parser: integerAtLeast(0),
-  defaultValue: DEFAULT_TTL_MS,
-  expected: 'a non-negative integer',
-} satisfies SettingDeclaration<number>;
-
-const contentTtlDeclaration = {
-  settingKey: 'contentTtlMs',
-  envKey: 'SKILLFORGE_TTL_MS',
-  configPath: ['cache', 'contentTtlMs'],
-  parser: integerAtLeast(0),
-  defaultValue: DEFAULT_TTL_MS,
-  expected: 'a non-negative integer',
-} satisfies SettingDeclaration<number>;
-
-function parseFolders(raw: string | undefined): string[] {
-  if (!raw) return [];
-  return raw
-    .split(delimiter)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .reduce<string[]>((acc, p) => {
-      const abs = resolve(p);
-      if (!acc.includes(abs)) acc.push(abs);
-      return acc;
-    }, []);
-}
-
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): SkillForgeConfig {
-  const folders = parseFolders(env['SKILLFORGE_FOLDERS']);
+  const folders = resolveSetting(foldersDeclaration, {}, env).value;
   const defaultFolder = join(homedir(), '.claude', 'plugins', 'cache', 'claude-code-skills');
   const ttlMs = resolveSetting(metadataTtlDeclaration, {}, env).value;
 
@@ -83,7 +53,7 @@ export async function loadResolvedConfig(
   const resolvedStore = store ?? new ConfigStore({ filePath: defaultConfigPath() });
   const persisted = await resolvedStore.load();
 
-  const envFolders = parseFolders(env['SKILLFORGE_FOLDERS']);
+  const envFolders = resolveSetting(foldersDeclaration, {}, env).value;
   const defaultFolder = join(homedir(), '.claude', 'plugins', 'cache', 'claude-code-skills');
 
   let folders: string[];
