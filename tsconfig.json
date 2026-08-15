@@ -25,5 +25,5 @@
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts", "**/*.test-harness.ts"]
 }

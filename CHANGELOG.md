@@ -32,7 +32,7 @@ Settings stop lying about themselves: one resolution path for every setting, the
 
 ### Verified
 
-- 1144 tests passing across 78 files; `tsc --noEmit` clean; 101 files ≤ 400 lines; `build` + `smoke` green. Precedence, conflict reporting and fail-loud behaviour were also exercised against the built `dist` on a real operator config, not only in tests.
+- 1146 tests passing across 79 files; `tsc --noEmit` clean; 101 files ≤ 400 lines; `build` + `smoke` green. Precedence, conflict reporting and fail-loud behaviour were also exercised against the built `dist` on a real operator config, not only in tests.
 
 ## [1.14.0] — 2026-08-14
 

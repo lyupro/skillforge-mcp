@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { resolve } from 'node:path';
 import { handleConfigure } from './configure.js';
-import { makeDeps, makeFakeStore } from './configure-test-harness.js';
+import { makeDeps, makeFakeStore } from './configure.test-harness.js';
 
 const ENV_KEY = 'SKILLFORGE_FOLDERS';
 const original = process.env[ENV_KEY];

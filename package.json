@@ -40,7 +40,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
     "dev": "tsx watch src/cli/dispatcher.ts serve",
     "start": "node dist/cli/dispatcher.js serve",
     "test": "vitest run",

@@ -23,7 +23,7 @@ You could set `cache.metadataTtlMs` in `config.json`, restart, and watch nothing
 
 **Engineering snapshot**
 
-- 1144 tests passing across 78 files; `tsc --noEmit` clean; `build` + `smoke` green; 101 source files ≤ 400 lines.
+- 1146 tests passing across 79 files; `tsc --noEmit` clean; `build` + `smoke` green; 101 source files ≤ 400 lines.
 - A guard test defends the layer structurally: reading a named environment key outside `src/config` is rejected, and a setting with an environment name may not carry a schema auto-default — the exact trap that kept the environment from ever winning. Both rules were verified by reproducing the violation, not by reading the code.
 - Precedence, conflict reporting, and fail-loud behaviour were exercised against the built `dist` on a real operator config, because a passing unit test and a working install are not the same claim.
 - One unrelated fix worth naming: an integration test had been scanning the developer's own skills directory through a fallback default, passing on a clean checkout and timing out on any machine with a real skill library.

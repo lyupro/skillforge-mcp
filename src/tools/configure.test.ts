@@ -7,7 +7,7 @@ import {
   makeDeps,
   makeFakeStore,
   makeFakeWatcher,
-} from './configure-test-harness.js';
+} from './configure.test-harness.js';
 import { defaultConfig } from '../config/config-schema.js';
 import type { PersistedConfig } from '../config/index.js';
 
