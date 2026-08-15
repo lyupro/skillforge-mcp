@@ -87,7 +87,7 @@ export async function loadResolvedConfig(
   };
 }
 
-export function formatSettingConflict(conflict: SettingConflict<number>): string {
+export function formatSettingConflict<T>(conflict: SettingConflict<T>): string {
   return `${conflict.settingKey}: ${conflict.envKey}=${conflict.envValue} wins over config value ${conflict.configValue}`;
 }
 

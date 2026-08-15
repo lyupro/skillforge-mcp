@@ -3,7 +3,6 @@ export {
   LoggingDecorator,
   stderrLogger,
   createLeveledLogger,
-  envDebugOverride,
 } from './logging-decorator.js';
 export type { Logger, LogLevel, LeveledLoggerOptions } from './logging-decorator.js';
 export { TimeoutDecorator } from './timeout-decorator.js';

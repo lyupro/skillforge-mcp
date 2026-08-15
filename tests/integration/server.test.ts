@@ -6,7 +6,7 @@
  * code paths are exercised end-to-end.
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -14,7 +14,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildServer, buildDeps } from '../../src/server.js';
 import { defaultConfig } from '../../src/config/config-schema.js';
-import type { ConfigStore } from '../../src/config/index.js';
+import { ConfigStore } from '../../src/config/index.js';
 import type { PersistedConfig } from '../../src/config/index.js';
 import type { FolderWatcher } from '../../src/watcher/index.js';
 
@@ -118,6 +118,91 @@ describe('MCP server — tool surface', () => {
     expect(names).toContain('skills__list');
     expect(names).toContain('skills__get');
     expect(names).toContain('skills__invoke');
+  });
+});
+
+describe('server log level resolution', () => {
+  const originalSkillforgeDebug = process.env['SKILLFORGE_DEBUG'];
+  const originalDebug = process.env['DEBUG'];
+
+  function setDebugEnvironment(skillforgeDebug?: string, debug?: string): void {
+    if (skillforgeDebug === undefined) delete process.env['SKILLFORGE_DEBUG'];
+    else process.env['SKILLFORGE_DEBUG'] = skillforgeDebug;
+    if (debug === undefined) delete process.env['DEBUG'];
+    else process.env['DEBUG'] = debug;
+  }
+
+  function mockConfig(logLevel?: 'debug' | 'info' | 'warn' | 'error'): void {
+    const config = defaultConfig();
+    config.logging.level = logLevel;
+    vi.spyOn(ConfigStore.prototype, 'load').mockResolvedValue(config);
+  }
+
+  afterEach(() => {
+    setDebugEnvironment(originalSkillforgeDebug, originalDebug);
+    vi.restoreAllMocks();
+  });
+
+  it('uses debug when SKILLFORGE_DEBUG=1', async () => {
+    setDebugEnvironment('1');
+    mockConfig();
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const deps = await buildDeps();
+    deps.logger.debug('debug-probe');
+
+    expect(stderr).toHaveBeenCalledWith('debug-probe\n');
+  });
+
+  it('uses config error when SKILLFORGE_DEBUG=0', async () => {
+    setDebugEnvironment('0');
+    mockConfig('error');
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const deps = await buildDeps();
+    deps.logger.warn('warn-probe');
+    deps.logger.error('error-probe');
+
+    expect(stderr).not.toHaveBeenCalledWith('warn-probe\n');
+    expect(stderr).toHaveBeenCalledWith('error-probe\n');
+  });
+
+  it('defaults to info when neither environment nor config sets a level', async () => {
+    setDebugEnvironment();
+    mockConfig();
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const deps = await buildDeps();
+    deps.logger.debug('debug-probe');
+    deps.logger.info('info-probe');
+
+    expect(stderr).not.toHaveBeenCalledWith('debug-probe\n');
+    expect(stderr).toHaveBeenCalledWith('info-probe\n');
+  });
+
+  it('lets options.logLevel override environment and config', async () => {
+    setDebugEnvironment('1');
+    mockConfig('error');
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const deps = await buildDeps({ logLevel: 'warn' });
+    deps.logger.info('info-probe');
+    deps.logger.warn('warn-probe');
+
+    expect(stderr).not.toHaveBeenCalledWith('info-probe\n');
+    expect(stderr).toHaveBeenCalledWith('warn-probe\n');
+  });
+
+  it('emits the resolved log-level conflict through the server logger', async () => {
+    setDebugEnvironment('1');
+    mockConfig('error');
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    await buildDeps();
+
+    expect(stderr).toHaveBeenCalledWith(
+      'logLevel: SKILLFORGE_DEBUG=1 wins over config value error\n',
+    );
   });
 });
 

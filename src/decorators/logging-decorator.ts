@@ -2,7 +2,10 @@ import { BaseDecorator } from './base-decorator.js';
 import type { InvocationStrategy } from '../handlers/invocation-strategy.js';
 import type { InvocationContext, InvocationResult, SkillContent } from '../core/types.js';
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+// Declared once with the setting itself; re-exported here so decorator users
+// need not reach into the config layer for the type.
+import type { LogLevel } from '../config/settings-declarations.js';
+export type { LogLevel };
 
 export interface Logger {
   debug(message: string): void;
@@ -49,25 +52,6 @@ export function createLeveledLogger(options: LeveledLoggerOptions = {}): Logger 
     warn: (m) => { if (pass('warn')) sink.warn(m); },
     error: (m) => { if (pass('error')) sink.error(m); },
   };
-}
-
-/**
- * Inspect the env for a debug override. `SKILLFORGE_DEBUG=1` or `DEBUG=1`
- * (any truthy non-empty value, case-insensitive `false`/`0` opt-out) flips the
- * effective level to `debug`. Returns null when no override is present so the
- * caller falls back to the persisted config knob.
- */
-export function envDebugOverride(env: NodeJS.ProcessEnv = process.env): LogLevel | null {
-  const candidates = [env['SKILLFORGE_DEBUG'], env['DEBUG']];
-  for (const raw of candidates) {
-    if (raw === undefined) continue;
-    const value = raw.trim().toLowerCase();
-    if (value === '' || value === '0' || value === 'false' || value === 'off' || value === 'no') {
-      continue;
-    }
-    return 'debug';
-  }
-  return null;
 }
 
 export class LoggingDecorator extends BaseDecorator {

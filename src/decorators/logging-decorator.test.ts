@@ -3,7 +3,6 @@ import {
   LoggingDecorator,
   stderrLogger,
   createLeveledLogger,
-  envDebugOverride,
 } from './logging-decorator.js';
 import type { Logger } from './logging-decorator.js';
 import type { InvocationStrategy } from '../handlers/invocation-strategy.js';
@@ -210,31 +209,7 @@ describe('createLeveledLogger', () => {
   });
 });
 
-describe('envDebugOverride', () => {
-  it('returns null when neither var is set', () => {
-    expect(envDebugOverride({})).toBeNull();
-  });
-
-  it('returns "debug" when SKILLFORGE_DEBUG=1', () => {
-    expect(envDebugOverride({ SKILLFORGE_DEBUG: '1' })).toBe('debug');
-  });
-
-  it('returns "debug" when DEBUG=true', () => {
-    expect(envDebugOverride({ DEBUG: 'true' })).toBe('debug');
-  });
-
-  it('returns null when SKILLFORGE_DEBUG=0 / false / empty', () => {
-    expect(envDebugOverride({ SKILLFORGE_DEBUG: '0' })).toBeNull();
-    expect(envDebugOverride({ SKILLFORGE_DEBUG: 'false' })).toBeNull();
-    expect(envDebugOverride({ SKILLFORGE_DEBUG: '' })).toBeNull();
-  });
-
-  it('prefers SKILLFORGE_DEBUG over DEBUG when both are set', () => {
-    // Either path returns "debug" when truthy — the test confirms a SF-specific
-    // truthy value wins over DEBUG=0 (no silent regression to off).
-    expect(envDebugOverride({ SKILLFORGE_DEBUG: '1', DEBUG: '0' })).toBe('debug');
-  });
-
+describe('stderrLogger', () => {
   it('stderrLogger debug method writes to stderr (1.7.1 schema gap fix)', () => {
     const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     stderrLogger.debug('dbg');

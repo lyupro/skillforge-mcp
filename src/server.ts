@@ -33,9 +33,9 @@ import {
   DecoratorChain,
   stderrLogger,
   createLeveledLogger,
-  envDebugOverride,
 } from './decorators/index.js';
 import type { LogLevel } from './decorators/index.js';
+import type { SettingConflict } from './config/settings-resolver.js';
 import type { ServerDeps } from './server-deps.js';
 import {
   listInputSchema,
@@ -167,9 +167,8 @@ export interface BuildDepsOptions {
    *  of config — forces a full cold scan. Set by the CLI `--no-cache` flag. */
   disableCache?: boolean;
   /** Explicit logger threshold override. Beats every other source — used by
-   *  the CLI `--verbose` / `--quiet` flags. When omitted the level falls back
-   *  to the env override (SKILLFORGE_DEBUG / DEBUG), then to `logging.level`
-   *  from the persisted config. */
+   *  the CLI `--verbose` / `--quiet` flags. When omitted the settings resolver
+   *  supplies env > config > default precedence. */
   logLevel?: LogLevel;
 }
 
@@ -215,10 +214,15 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
   // Logger level precedence: explicit option (CLI flag) wins over anything a
   // user configured; below it the settings layer has already applied
   // env > config > default.
-  const effectiveLevel: LogLevel = options.logLevel ?? envDebugOverride() ?? resolved.logLevel.value;
+  const effectiveLevel: LogLevel = options.logLevel ?? resolved.logLevel.value;
   const logger = createLeveledLogger({ level: effectiveLevel, sink: stderrLogger });
-  for (const ttl of [resolved.metadataTtlMs, resolved.contentTtlMs]) {
-    if (ttl.conflict !== undefined) logger.warn(formatSettingConflict(ttl.conflict));
+  const settingConflicts: Array<SettingConflict<unknown> | undefined> = [
+    resolved.metadataTtlMs.conflict,
+    resolved.contentTtlMs.conflict,
+    resolved.logLevel.conflict,
+  ];
+  for (const conflict of settingConflicts) {
+    if (conflict !== undefined) logger.warn(formatSettingConflict(conflict));
   }
   const metadataCache = new SkillMetadataCache({ ttlMs: resolved.metadataTtlMs.value });
   const sandboxRunner = new SandboxRunner({ logger });
