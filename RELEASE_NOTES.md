@@ -7,6 +7,27 @@ Per-release notes, newest first. For the terse machine-style changelog see [CHAN
 
 ---
 
+## v1.15.0 — Settings that tell the truth about themselves
+
+**Release date:** 2026-08-15
+
+You could set `cache.metadataTtlMs` in `config.json`, restart, and watch nothing change. The key was in the documented schema, the server never read it — it read `SKILLFORGE_TTL_MS` and nothing else. Worse, the codebase carried two opposite precedence rules at once: folders honoured the environment first, the TTL honoured the config file first, and neither was written down anywhere a user could see. This release replaces guesswork with one answer.
+
+- **One rule for every setting: environment > config file > built-in default.** No per-setting exceptions, because two rules mean nobody remembers which applies where. The losing side is still parsed, so a malformed value in an overridden key fails the startup instead of hiding until the day it becomes the winner.
+- **Every setting knows where it came from.** A single declaration per setting (environment names, config path, default, parser, expected shape) feeds a resolver that returns the value *and* its source — `env`, `config`, or `default`. That provenance is what makes the rest of this release possible.
+- **`skillforge config` answers the question from the terminal.** Which value is in force, where it came from, what it overrode, and the path of the config file it read. `--json` for scripts. A malformed value exits non-zero naming the setting, not a stack trace.
+- **A write that changes nothing now says so.** `skills__configure` with `add_folder` used to persist your folder and hand back the live list without it, because `SKILLFORGE_FOLDERS` was set. It now names the variable that overrides the write and how to drop it.
+- **A bad value stops the server instead of becoming a default.** `SKILLFORGE_TTL_MS=abc` reports the setting, the source, what it got and what it expected. Silent fallback was the single most expensive behaviour in this area: the symptom appeared hours later, in a cache that behaved like nobody had configured it.
+- **`reload` can scan one folder.** `skills__reload` takes an optional `folder`; the response gains `scope: { folder, scanned }` while the existing diff stays global, so older clients are unaffected. The registry keeps every candidate rather than only the winner, which is what makes this honest: drop one folder's copy of a name and the shadowed skill from another folder surfaces, exactly as a full rescan would. An equivalence test enforces that.
+- **A zero TTL means the cache is off,** not "use the default" — every call rescans and nothing is stored.
+
+**Engineering snapshot**
+
+- 1144 tests passing across 78 files; `tsc --noEmit` clean; `build` + `smoke` green; 101 source files ≤ 400 lines.
+- A guard test defends the layer structurally: reading a named environment key outside `src/config` is rejected, and a setting with an environment name may not carry a schema auto-default — the exact trap that kept the environment from ever winning. Both rules were verified by reproducing the violation, not by reading the code.
+- Precedence, conflict reporting, and fail-loud behaviour were exercised against the built `dist` on a real operator config, because a passing unit test and a working install are not the same claim.
+- One unrelated fix worth naming: an integration test had been scanning the developer's own skills directory through a fallback default, passing on a clean checkout and timing out on any machine with a real skill library.
+
 ## v1.14.0 — A server that knows when to die
 
 **Release date:** 2026-08-14

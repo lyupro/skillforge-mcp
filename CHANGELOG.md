@@ -2,6 +2,38 @@
 
 All notable changes to **SkillForge MCP** are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] — 2026-08-15
+
+Settings stop lying about themselves: one resolution path for every setting, the environment overriding the config file again, and a `reload` that can scan a single folder without pretending it scanned them all.
+
+### Fixed
+
+- **`cache.metadataTtlMs` and `cache.contentTtlMs` never reached the caches.** Both keys existed in the config schema and were silently ignored — the server read `SKILLFORGE_TTL_MS` and nothing else, so editing the documented key in `config.json` changed nothing at all. Each TTL is now resolved separately and handed to its own cache.
+- **Two opposite precedence rules lived in the same codebase.** Folders honoured the environment first; the TTL honoured the config file first. Every setting now resolves as **environment > config file > built-in default**, and the losing side is still parsed — malformed input in an overridden key fails the startup instead of being swallowed.
+- **`skills__configure` reported success for a write that changed nothing.** With `SKILLFORGE_FOLDERS` set, `add_folder` wrote the folder to `config.json` and returned the live list without it. Folder actions now name the variable that overrides them and how to drop it; blacklist actions stay silent, having no environment counterpart.
+- **Schema auto-defaults made every key look deliberately set.** `logging.level` and both cache TTLs carried a default, so a key was present in every config that had ever loaded, and the environment could never win. The keys are optional now: absent means "not set", not "set to the default".
+- **The integration suite scanned the developer's own skills.** A fake config store with an empty folder list let `loadResolvedConfig` fall through to the built-in default root (`~/.claude/plugins/cache/claude-code-skills`) — a real directory on a real machine, where the test timed out on 100+ skills while passing on a clean checkout.
+
+### Added
+
+- **Single-folder reload.** `skills__reload` accepts an optional `folder` and rescans just that one; the response carries an extra `scope: { folder, scanned }`, while the `{loaded, added, removed, errors}` diff stays global for older clients. A folder that is not configured is an error, never a silent full rescan.
+- **A registry that keeps every candidate, not just the winner.** Shadowed skills are retained per folder and the winner is resolved on read, so a partial reload that removes one folder's copy surfaces the shadowed one from another folder. A partial reload and a full rescan produce the same registry — enforced by an equivalence test.
+- **One declaration per setting, with provenance.** `src/config/settings-declarations.ts` is the single place a setting is defined (env names, config path, default, parser, expected shape); `settings-resolver.ts` answers with the value *and* where it came from (`env` / `config` / `default`). Conflicts print one line naming both sides at startup.
+- **`skillforge config`** — a terminal command that answers "which value is in force and why": setting, value, source, overridden side, plus the config file path. `--json` for machines; an invalid value exits non-zero naming the setting instead of printing a stack.
+- **`ttlMs: 0` disables a cache** instead of being rejected — every call rescans, and nothing is stored.
+- **Fail-loud on malformed settings.** `SettingResolutionError` names the setting, the source, what was received and what was expected. There is no silent fallback to the default.
+- **A guard test for the settings layer.** Reading a named environment key outside `src/config` is rejected (passing an `env` object down is legitimate injection), and a setting with an environment name may not carry a schema auto-default. Both rules were verified by reproducing the violation.
+
+### Changed
+
+- **Registry index format v4** stores candidates rather than winners; a cold start now reconstructs exactly what a full scan produces.
+- **The hand-rolled debug override is gone.** `envDebugOverride` was a second path to a value the resolver already owns — `SKILLFORGE_DEBUG` and `DEBUG` are now ordinary declared sources, with `0`/`false`/`off`/`no` meaning "let the config decide" rather than "force logging off".
+- **Process-spawning tests carry a 20 s budget** instead of inheriting the 5 s default, which they legitimately exceed; the rest of the suite keeps the short default so real hangs still surface.
+
+### Verified
+
+- 1144 tests passing across 78 files; `tsc --noEmit` clean; 101 files ≤ 400 lines; `build` + `smoke` green. Precedence, conflict reporting and fail-loud behaviour were also exercised against the built `dist` on a real operator config, not only in tests.
+
 ## [1.14.0] — 2026-08-14
 
 The server now exits when its client goes away. Before this release it never exited at all.
