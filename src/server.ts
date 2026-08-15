@@ -9,7 +9,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadResolvedConfig, buildPatternScanner } from './config.js';
+import { loadResolvedConfig, buildPatternScanner, formatSettingConflict } from './config.js';
 import { ConfigStore, defaultConfigPath, defaultIndexPath } from './config/index.js';
 import { FolderWatcher, ConfigWatcher } from './watcher/index.js';
 import { reconcileFolders } from './reconcile.js';
@@ -183,8 +183,6 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
     auditExceptions: resolved.persisted.security.auditExceptions,
     auditTarget: resolved.persisted.security.auditTarget,
   });
-  const metadataCache = new SkillMetadataCache({ ttlMs: resolved.ttlMs });
-
   // `deps` is assigned at the end of buildDeps; every closure below runs only
   // after start(), so the reference is populated by then.
   let deps: ServerDeps;
@@ -219,6 +217,10 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
   const effectiveLevel: LogLevel =
     options.logLevel ?? envDebugOverride() ?? resolved.persisted.logging.level;
   const logger = createLeveledLogger({ level: effectiveLevel, sink: stderrLogger });
+  for (const ttl of [resolved.metadataTtlMs, resolved.contentTtlMs]) {
+    if (ttl.conflict !== undefined) logger.warn(formatSettingConflict(ttl.conflict));
+  }
+  const metadataCache = new SkillMetadataCache({ ttlMs: resolved.metadataTtlMs.value });
   const sandboxRunner = new SandboxRunner({ logger });
   // allowScripts flag captured from initial config load. A ref object is used
   // so tools/configure can update it by calling configStore.load() indirectly.
@@ -267,7 +269,7 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
     registry: new SkillRegistry(resolved.folders, resolver),
     resolver,
     metadataCache,
-    contentCache: new SkillContentCache({ ttlMs: resolved.ttlMs }),
+    contentCache: new SkillContentCache({ ttlMs: resolved.contentTtlMs.value }),
     indexStore,
     indexEnabled,
     parser: new FrontmatterParser({ formatRegistry, logger }),

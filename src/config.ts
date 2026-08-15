@@ -2,6 +2,13 @@ import { delimiter, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { ConfigStore, defaultConfigPath } from './config/index.js';
 import type { PersistedConfig } from './config/index.js';
+import {
+  integerAtLeast,
+  resolveSetting,
+  type ResolvedSetting,
+  type SettingConflict,
+  type SettingDeclaration,
+} from './config/settings-resolver.js';
 import { PatternScanner } from './security/index.js';
 
 export interface SkillForgeConfig {
@@ -12,6 +19,22 @@ export interface SkillForgeConfig {
 }
 
 const DEFAULT_TTL_MS = 300_000;
+
+const metadataTtlDeclaration = {
+  envKey: 'SKILLFORGE_TTL_MS',
+  configPath: ['cache', 'metadataTtlMs'],
+  parser: integerAtLeast(0),
+  defaultValue: DEFAULT_TTL_MS,
+  expected: 'a non-negative integer',
+} satisfies SettingDeclaration<number>;
+
+const contentTtlDeclaration = {
+  envKey: 'SKILLFORGE_TTL_MS',
+  configPath: ['cache', 'contentTtlMs'],
+  parser: integerAtLeast(0),
+  defaultValue: DEFAULT_TTL_MS,
+  expected: 'a non-negative integer',
+} satisfies SettingDeclaration<number>;
 
 function parseFolders(raw: string | undefined): string[] {
   if (!raw) return [];
@@ -26,26 +49,23 @@ function parseFolders(raw: string | undefined): string[] {
     }, []);
 }
 
-function parseTtl(raw: string | undefined): number {
-  if (!raw) return DEFAULT_TTL_MS;
-  const n = Number(raw);
-  if (Number.isNaN(n) || n <= 0) return DEFAULT_TTL_MS;
-  return n;
-}
-
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): SkillForgeConfig {
   const folders = parseFolders(env['SKILLFORGE_FOLDERS']);
   const defaultFolder = join(homedir(), '.claude', 'plugins', 'cache', 'claude-code-skills');
+  const ttlMs = resolveSetting(metadataTtlDeclaration, {}, env).value;
 
   return {
     folders: folders.length > 0 ? folders : [defaultFolder],
-    ttlMs: parseTtl(env['SKILLFORGE_TTL_MS']),
+    ttlMs,
   };
 }
 
 export interface ResolvedConfig {
   /** Folders ultimately used by the server (env override > persisted folders > built-in default). */
   folders: string[];
+  metadataTtlMs: ResolvedSetting<number>;
+  contentTtlMs: ResolvedSetting<number>;
+  /** Compatibility alias for the metadata cache TTL. */
   ttlMs: number;
   /** Full persisted config (or schema defaults if file absent). */
   persisted: PersistedConfig;
@@ -78,11 +98,20 @@ export async function loadResolvedConfig(
     }
   }
 
+  const metadataTtlMs = resolveSetting(metadataTtlDeclaration, persisted, env);
+  const contentTtlMs = resolveSetting(contentTtlDeclaration, persisted, env);
+
   return {
     folders,
-    ttlMs: parseTtl(env['SKILLFORGE_TTL_MS']),
+    metadataTtlMs,
+    contentTtlMs,
+    ttlMs: metadataTtlMs.value,
     persisted,
   };
+}
+
+export function formatSettingConflict(conflict: SettingConflict<number>): string {
+  return `${conflict.settingKey}: config value ${conflict.configValue} wins over ${conflict.envKey}=${conflict.envValue}`;
 }
 
 /** Build a PatternScanner from persisted security settings, or null if auto-audit is off

@@ -16,8 +16,8 @@ describe('configSchema', () => {
     expect(result.security.allowScripts).toBe(false);
     expect(result.security.sandboxScripts).toBe(true);
     expect(result.security.sandboxRestrictedPaths).toEqual(['~/.ssh', '~/.aws', '~/.gnupg']);
-    expect(result.cache.metadataTtlMs).toBe(300_000);
-    expect(result.cache.contentTtlMs).toBe(300_000);
+    expect(result.cache.metadataTtlMs).toBeUndefined();
+    expect(result.cache.contentTtlMs).toBeUndefined();
     expect(result.cache.maxSizeMb).toBe(50);
     expect(result.cache.indexEnabled).toBe(true);
     expect(result.cache.indexPath).toBeUndefined();
@@ -37,6 +37,14 @@ describe('configSchema', () => {
     const original = defaultConfig();
     const roundTripped = configSchema.parse(JSON.parse(JSON.stringify(original)));
     expect(roundTripped).toEqual(original);
+  });
+
+  it('does not persist cache TTL keys that were not explicitly set', () => {
+    const serialized = JSON.parse(JSON.stringify(defaultConfig())) as {
+      cache: Record<string, unknown>;
+    };
+    expect(serialized.cache).not.toHaveProperty('metadataTtlMs');
+    expect(serialized.cache).not.toHaveProperty('contentTtlMs');
   });
 
   it('preserves unknown extra fields (passthrough — forward-compatibility)', () => {

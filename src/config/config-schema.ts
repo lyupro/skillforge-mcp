@@ -43,8 +43,8 @@ const securitySchema = z
 
 const cacheSchema = z
   .object({
-    metadataTtlMs: z.number().nonnegative().default(300_000),
-    contentTtlMs: z.number().nonnegative().default(300_000),
+    metadataTtlMs: z.number().nonnegative().optional(),
+    contentTtlMs: z.number().nonnegative().optional(),
     maxSizeMb: z.number().nonnegative().default(50),
     // Persistent on-disk registry index — survives between CLI processes.
     indexEnabled: z.boolean().default(true),
