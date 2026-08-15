@@ -23,7 +23,7 @@ describe('configSchema', () => {
     expect(result.cache.indexPath).toBeUndefined();
     expect(result.watcher.enabled).toBe(true);
     expect(result.watcher.debounceMs).toBe(500);
-    expect(result.logging.level).toBe('info');
+    expect(result.logging.level).toBeUndefined();
     expect(result.logging.file).toBeNull();
     expect(result.lifecycle).toEqual({
       shutdownGraceMs: 2_000,
@@ -45,6 +45,12 @@ describe('configSchema', () => {
     };
     expect(serialized.cache).not.toHaveProperty('metadataTtlMs');
     expect(serialized.cache).not.toHaveProperty('contentTtlMs');
+  });
+
+  it('does not supply logging.level when logging is omitted but keeps the file default', () => {
+    const result = configSchema.parse({});
+    expect(result.logging).not.toHaveProperty('level');
+    expect(result.logging.file).toBeNull();
   });
 
   it('preserves unknown extra fields (passthrough — forward-compatibility)', () => {

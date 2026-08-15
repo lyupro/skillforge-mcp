@@ -10,7 +10,9 @@ import {
 import {
   contentTtlDeclaration,
   foldersDeclaration,
+  logLevelDeclaration,
   metadataTtlDeclaration,
+  type LogLevel,
 } from './config/settings-declarations.js';
 import { PatternScanner } from './security/index.js';
 
@@ -37,6 +39,7 @@ export interface ResolvedConfig {
   folders: string[];
   metadataTtlMs: ResolvedSetting<number>;
   contentTtlMs: ResolvedSetting<number>;
+  logLevel: ResolvedSetting<LogLevel>;
   /** Compatibility alias for the metadata cache TTL. */
   ttlMs: number;
   /** Full persisted config (or schema defaults if file absent). */
@@ -72,11 +75,13 @@ export async function loadResolvedConfig(
 
   const metadataTtlMs = resolveSetting(metadataTtlDeclaration, persisted, env);
   const contentTtlMs = resolveSetting(contentTtlDeclaration, persisted, env);
+  const logLevel = resolveSetting(logLevelDeclaration, persisted, env);
 
   return {
     folders,
     metadataTtlMs,
     contentTtlMs,
+    logLevel,
     ttlMs: metadataTtlMs.value,
     persisted,
   };

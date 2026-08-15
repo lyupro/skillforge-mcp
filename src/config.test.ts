@@ -118,6 +118,42 @@ function basePersistedConfig(overrides: Partial<PersistedConfig> = {}): Persiste
 }
 
 describe('loadResolvedConfig', () => {
+  it('resolves the log level from environment and reports a config conflict', async () => {
+    const persisted = basePersistedConfig({ logging: { level: 'error', file: null } });
+    const resolved = await loadResolvedConfig(
+      { SKILLFORGE_DEBUG: '1' },
+      fakeStore(persisted) as never,
+    );
+    expect(resolved.logLevel).toEqual({
+      value: 'debug',
+      source: 'env',
+      conflict: {
+        settingKey: 'logLevel',
+        configValue: 'error',
+        envKey: 'SKILLFORGE_DEBUG',
+        envValue: '1',
+      },
+    });
+  });
+
+  it('resolves the log level from config without a conflict when the env flag is off', async () => {
+    const persisted = basePersistedConfig({ logging: { level: 'error', file: null } });
+    const resolved = await loadResolvedConfig(
+      { SKILLFORGE_DEBUG: '0' },
+      fakeStore(persisted) as never,
+    );
+    expect(resolved.logLevel).toEqual({ value: 'error', source: 'config' });
+  });
+
+  it('uses the declaration default when no log-level source is set', async () => {
+    const persisted = basePersistedConfig({ logging: { file: null } });
+    const resolved = await loadResolvedConfig({}, fakeStore(persisted) as never);
+    expect(resolved.logLevel).toEqual({ value: 'info', source: 'default' });
+    // The default lives in the declaration only: an absent key stays absent in
+    // the persisted config, so provenance can still tell "unset" from "chosen".
+    expect(resolved.persisted.logging.level).toBeUndefined();
+  });
+
   it('uses separate defaults when neither TTL source is set', async () => {
     const persisted = basePersistedConfig({
       cache: { maxSizeMb: 50, indexEnabled: true },

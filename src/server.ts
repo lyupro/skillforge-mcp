@@ -212,10 +212,10 @@ export async function buildDeps(options: BuildDepsOptions = {}): Promise<ServerD
     },
   });
 
-  // Logger level precedence: explicit option (CLI flag) → env override
-  // (SKILLFORGE_DEBUG / DEBUG) → persisted `logging.level` → schema default.
-  const effectiveLevel: LogLevel =
-    options.logLevel ?? envDebugOverride() ?? resolved.persisted.logging.level;
+  // Logger level precedence: explicit option (CLI flag) wins over anything a
+  // user configured; below it the settings layer has already applied
+  // env > config > default.
+  const effectiveLevel: LogLevel = options.logLevel ?? envDebugOverride() ?? resolved.logLevel.value;
   const logger = createLeveledLogger({ level: effectiveLevel, sink: stderrLogger });
   for (const ttl of [resolved.metadataTtlMs, resolved.contentTtlMs]) {
     if (ttl.conflict !== undefined) logger.warn(formatSettingConflict(ttl.conflict));

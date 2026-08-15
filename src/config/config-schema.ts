@@ -63,7 +63,7 @@ const watcherSchema = z
 
 const loggingSchema = z
   .object({
-    level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    level: z.enum(['debug', 'info', 'warn', 'error']).optional(),
     file: z.string().nullable().default(null),
   })
   .passthrough();
