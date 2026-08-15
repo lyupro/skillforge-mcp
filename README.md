@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-stdio-purple)](https://modelcontextprotocol.io)
 
-**v1.14.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, a server that exits when its client goes away (transport close / signals / dead parent), verified host entries that prefer a command over a path, terminal `tools` + `folders` + `formats` + `skills` + `security` + `version-policy` subcommands, blacklist name-glob and path-glob patterns, config-driven skill format registry with directory-name derivation, context-aware security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 1003 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
+**v1.15.0** — 5 MCP tools, one-command install across Claude Code / Codex CLI / Cursor / Hermes Agent, a server that exits when its client goes away (transport close / signals / dead parent), verified host entries that prefer a command over a path, terminal `tools` + `folders` + `formats` + `skills` + `security` + `version-policy` + `config` subcommands, partial single-folder reload, environment-first settings resolution with provenance, blacklist name-glob and path-glob patterns, config-driven skill format registry with directory-name derivation, context-aware security auto-audit (`auditTarget`) with an `auditExceptions` allowlist, per-bundle `versionPolicy` (pin / freeze) with highest-semver collision resolution, leveled stderr logger with `--verbose` / `--quiet`, candidate-aware skip lines, persistent on-disk registry index for fast warm starts, batch `skills get`, config live-reload, forward-compatible config schemas, global/project install scopes, Claude Code plugin packaging, 1144 tests, 10 sample skills, modular architecture (all source files ≤ 400 lines).
 
 ---
 
@@ -121,6 +121,7 @@ The `skillforge` / `skillforge-mcp` binary is a dispatcher — the first positio
 | `uninstall` | Reverse a previous install. Accepts the same `--scope global\|project` flag. |
 | `tools` | Print the 5 MCP tools the server exposes (name, description, parameters, example). Pass `--json` for machine-readable output. |
 | `folders` | Manage skill folders from the terminal — `list` / `add` / `remove` / `alias` / `rename` / `enable` / `disable` / `reset`. |
+| `config` | Show which setting is in force and where it came from (environment > config file > built-in default), plus the config file path. Pass `--json` for machine-readable output. |
 | `formats` | Manage the skill format registry — `list` / `add` / `remove` / `enable` / `disable`. Add support for a new LLM's layout (e.g. Gemini Gem files) without a code release. |
 | `skills` | Inspect the skill registry from the terminal — `list` (with `--search`, `--source`, `--folder`, `--folder-tag`, `--json`, `--folder-fmt`), `get <names>` (comma-separated for a batch fetch), `reload`, `reindex`. `--no-cache` bypasses the on-disk index. |
 | `security` | Manage security knobs from the terminal — `audit-exceptions list\|add\|remove\|clear`, `audit-target [scripts\|all]`, `audit-patterns list`, `blacklist list\|add\|remove\|clear`. |
@@ -137,6 +138,32 @@ skillforge tools --json   # machine-readable: { "tools": [ ... ] }
 ```
 
 Prints every MCP tool the server exposes (`skills__list`, `skills__get`, `skills__invoke`, `skills__configure`, `skills__reload`) with its description, parameters, and an example invocation — handy for confirming the surface without starting a session.
+
+### Inspect effective settings — `skillforge config`
+
+```bash
+skillforge config          # human-readable values and provenance
+skillforge config --json   # machine-readable report
+```
+
+Shows the effective value and source (`env`, `config`, or `default`) for every declared setting (`metadataTtlMs`, `contentTtlMs`, `folders`, `hermesHome`, and `logLevel`). The `OVERRIDDEN` column names the config value the environment displaced, or `-` when the sources agree. Folder paths are listed under the table rather than crammed into a cell. For example:
+
+```text
+Config file: /home/me/.lyupro/.skillforge/config.json
+
+SETTING        VALUE             SOURCE   OVERRIDDEN
+metadataTtlMs  0                 env      config value 300000
+contentTtlMs   0                 env      config value 300000
+folders        2 folder(s)       config   -
+hermesHome     /home/me/.hermes  default  -
+logLevel       info              config   -
+
+folders:
+  /home/me/skills
+  /home/me/team-skills
+```
+
+Invalid setting values are reported on stderr and return exit code `1`; unknown command arguments return exit code `2`.
 
 ### Manage skill folders from the terminal — `skillforge folders`
 
@@ -279,12 +306,12 @@ Before running npm, `update` runs two pre-flight checks and **surfaces** problem
 | `skills__list`      | Enumerate available skills (metadata only). Filters: `folder`, `search`, `source`, `folderTag`. |
 | `skills__get`       | Fetch full SKILL.md body + metadata for one skill. |
 | `skills__invoke`    | Execute a skill via its assigned strategy, wrapped in the decorator chain (Logging → Timeout → Cache). Composite skills (`metadata.skills: [a, b]`) walk nested skills sequentially with DFS cycle detection. |
-| `skills__configure` | Manage configured folders + manual blacklist. Actions: `add_folder`, `remove_folder`, `list_folders`, `set_blacklist`, `get_blacklist`, `reset`. Persists to the config file and reconciles in-process state without restart. |
-| `skills__reload`    | Force a full rescan of all configured folders. Returns `{ loaded, added, removed, errors }` diff vs. the previous registry snapshot. |
+| `skills__configure` | Manage configured folders + manual blacklist. Actions: `add_folder`, `remove_folder`, `list_folders`, `set_blacklist`, `get_blacklist`, `reset`. Persists to the config file and reconciles in-process state without restart. `add_folder` and `remove_folder` warn when `SKILLFORGE_FOLDERS` overrides the persisted result, so the effective folder list does not change yet. |
+| `skills__reload`    | Rescan all configured folders, or pass optional `folder` to rescan one configured folder. A partial response adds `scope: { folder, scanned }`; the global `{ loaded, added, removed, errors }` diff remains unchanged for existing clients. An unconfigured folder is an error, never a silent full rescan. |
 
 ## Configure which folders to scan
 
-By default SkillForge scans `~/.claude/plugins/cache/claude-code-skills/`. Override via environment:
+Folder settings follow **environment > config file > built-in default**. When set, `SKILLFORGE_FOLDERS` replaces the persisted folder list in full:
 
 ```bash
 # Windows (PowerShell)
@@ -294,7 +321,7 @@ $env:SKILLFORGE_FOLDERS = "C:\path\to\skills;C:\other\folder"
 export SKILLFORGE_FOLDERS=/home/me/skills:/home/me/team-skills
 ```
 
-Path separator is platform-native (`;` on Windows, `:` elsewhere). Or use `skills__configure` to manage the persisted list — see [docs/CONFIGURATION.md](./docs/CONFIGURATION.md).
+Path separator is platform-native (`;` on Windows, `:` elsewhere). Without the environment variable, use `skills__configure` to manage the persisted list; the built-in default applies only when neither source supplies one. If `SKILLFORGE_FOLDERS` is set, folder changes are still written to the config file but cannot affect the active list until the variable is unset. Run `skillforge config` to see the effective values, their sources, any overridden config value, and the config file path. See [docs/CONFIGURATION.md](./docs/CONFIGURATION.md).
 
 For shared content across multiple tools, the convention is `~/.lyupro/skills/` (Lyu Pro brand shared content folder).
 

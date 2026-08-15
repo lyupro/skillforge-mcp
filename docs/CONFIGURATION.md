@@ -13,10 +13,49 @@ This document covers both. For the field-level skill frontmatter contract, see [
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SKILLFORGE_FOLDERS` | unset | Folder list (path-separator: `;` on Windows, `:` elsewhere). When set, **overrides** persisted `folders[]` entirely. |
-| `SKILLFORGE_TTL_MS` | `300000` (5 min) | Metadata cache TTL. Below it, `skills__list` re-uses the cached registry; after, the next call rescans. Set to `0` to fall back to default. |
+| `SKILLFORGE_FOLDERS` | unset | Folder list (path separator: `;` on Windows, `:` elsewhere). Under the normal environment-first precedence, a non-empty value completely replaces persisted `folders[]`. |
+| `SKILLFORGE_TTL_MS` | `300000` (5 min) | Sets both `metadataTtlMs` and `contentTtlMs`. `0` disables both caches, so every call rescans; an empty string is not set. A non-numeric or negative value raises `SettingResolutionError` during startup instead of falling back to the default. |
+| `SKILLFORGE_DEBUG` | unset | First entry in the ordered log-level environment list. An enabling flag (`1`, `true`, `on`, `yes`) selects `debug`; a level name selects that level. `0`, `false`, `off`, `no`, or an empty value does not override persisted config. |
+| `DEBUG` | unset | Second entry in the ordered log-level environment list, considered when `SKILLFORGE_DEBUG` is not set. It accepts the same values and the same no-override forms. |
+| `HERMES_HOME` | `~/.hermes` | Hermes home directory. An empty string is treated as not set. |
 
 Env reads happen on **server boot only**, inside `loadResolvedConfig`. Changing them mid-session has no effect until the host restarts the MCP server.
+
+---
+
+## Settings resolution
+
+Every declared setting follows one resolution order: **environment > config file > built-in default**. The resolved value retains its provenance as `env`, `config`, or `default`. An absent key in `config.json` is not set; it does not become an explicit config value merely because the setting has a default.
+
+Resolution fails loud. An invalid environment or config value stops startup with a `SettingResolutionError` that names the setting and source, shows the received value, and describes the expected value. There is no silent fallback. The config side is parsed even when an environment value wins, so malformed config remains an error rather than being hidden by the override.
+
+When valid environment and config values both exist, the environment value wins and the conflict remains visible in three places: a startup line on server stderr names both sides, folder actions include it in the `skills__configure` response, and `skillforge config` reports the overridden side.
+
+---
+
+## Inspecting resolved settings
+
+Run `skillforge config` to see each effective setting, its source, any overridden config value, and the config file path. The folder row uses a count to keep the table narrow; the complete folder paths are printed one per line below it. Use `--json` for machine-readable output. If any setting is invalid, the command writes the resolution error to stderr and exits with a non-zero status.
+
+```text
+$ skillforge config
+Config file: /home/alice/.lyupro/.skillforge/config.json
+
+SETTING        VALUE                   SOURCE   OVERRIDDEN
+metadataTtlMs  0                       env      config value 300000
+contentTtlMs   0                       env      config value 300000
+folders        2 folder(s)             config   -
+hermesHome     /home/alice/.hermes     default  -
+logLevel       info                    config   -
+
+folders:
+  /srv/team-skills
+  /home/alice/.agents/skills
+```
+
+Settings whose sources do not disagree show `-` in the OVERRIDDEN column. When the config file does not exist yet, the first line says so and every row reads `default`. The `folders` row is a count because a dozen absolute paths do not fit a table cell — the paths follow underneath.
+
+For scripts, use `skillforge config --json` and consume stdout only.
 
 ---
 
@@ -191,8 +230,8 @@ want the stricter behavior.
 
 | Field | Default | Effect |
 |-------|---------|--------|
-| `metadataTtlMs` | `300000` (5 min) | `SkillMetadataCache` freshness window. After expiry, the next `skills__list` rescans. Resolved as **config key > `SKILLFORGE_TTL_MS` > default**; the key is optional, and an absent key means "not set" rather than "set to the default". `0` disables the cache (every call rescans). A malformed value is a startup error, not a silent default. When both sources are set, the config value wins and a line naming both is written to stderr. |
-| `contentTtlMs` | `300000` | Same rules as `metadataTtlMs`, resolved independently — `SKILLFORGE_TTL_MS` is the shared fallback for whichever key is unset. |
+| `metadataTtlMs` | `300000` (5 min) | `SkillMetadataCache` freshness window. After expiry, the next `skills__list` rescans. Resolved as **`SKILLFORGE_TTL_MS` > persisted key > default**; the key is optional, and an absent key means "not set" rather than "set to the default". `0` disables the cache (every call rescans). A malformed value is a startup error, not a silent default. When both sources are set, the environment value wins and a stderr line names both the environment and config sides. |
+| `contentTtlMs` | `300000` | Same rules as `metadataTtlMs`, resolved independently — `SKILLFORGE_TTL_MS` supplies the environment value for both TTL settings. |
 | `maxSizeMb` | `50` | Reserved — content cache currently uses LRU eviction by entry count, not bytes. |
 | `indexEnabled` | `true` | Enables the persistent on-disk registry index. A fresh CLI process hydrates the registry from the index file with one read instead of a full cold scan. Set `false` (or pass `--no-cache`) to always do a full scan. |
 | `indexPath` | `null` | Absolute path to the index file. When `null`/absent it is derived as `<configDir>/cache/registry-index.json`. |
@@ -218,9 +257,9 @@ The on-disk index is invalidated automatically: a fingerprint of every skill fil
 The threshold is sourced in this order — first non-empty value wins:
 
 1. **CLI flag.** `skillforge skills … --verbose` (or `-v`) forces `debug`; `--quiet` (or `-q`) forces `warn`. Per-process override.
-2. **Env override.** `SKILLFORGE_DEBUG=1` or `DEBUG=1` flips the level to `debug`. Set either to a falsy value (`0`, `false`, empty) to opt out.
+2. **Env override.** `SKILLFORGE_DEBUG` and `DEBUG` form an ordered list: the first one set wins. Enabling values (`1`, `true`, `on`, `yes`) select `debug`, while a log-level name selects that level. A falsy value (`0`, `false`, `off`, `no`, or empty) means the environment does not override the persisted config; it does not turn logging off.
 3. **Persisted config.** `logging.level` in `config.json`.
-4. **Schema default.** `info`.
+4. **Setting declaration default.** `info`. This default is intentionally not applied by the Zod schema, because doing so would make the key appear config-supplied in every file and prevent an environment value from winning.
 
 stdout stays reserved for JSON payloads (`--json` mode on every command). Diagnostics always go to stderr, so a pipeline like `skillforge skills get foo --json | jq .` is never broken by a logger line landing on the wrong stream.
 
@@ -490,7 +529,7 @@ The `skills__list` MCP tool accepts an optional `folderTag` parameter. When set,
 
 This makes it possible for an LLM session or automation script to scope skill lookups to a logical group without knowing the exact folder paths.
 
-**Edge case — env-override folders:** When `SKILLFORGE_FOLDERS` is set, it bypasses `config.json` entirely and the resolved folders carry no tag metadata. A `folderTag` filter will therefore return an empty skill list in that mode. This is expected behaviour: env-override is an escape hatch for single-session path injection, not a persistent configuration surface.
+**Edge case — environment-selected folders:** Under the standard environment-first precedence, a non-empty `SKILLFORGE_FOLDERS` value replaces `config.json` folders entirely, and the resolved folders carry no tag metadata. A `folderTag` filter will therefore return an empty skill list in that mode. This is expected behaviour for an ephemeral environment override rather than a persistent tagged configuration.
 
 **Intended future use-case:** Per-phase folder selection. A workflow with multiple stages (e.g. idea-scout → build → review) can tag folders per phase (`tags: ["build"]`, `tags: ["review"]`) and pass the matching `folderTag` at each phase transition to load only the relevant skills without exposing unrelated prompts to the model context.
 
