@@ -68,7 +68,13 @@ beforeAll(async () => {
   const deps = await buildDeps();
   deps.folders = [fixtureDir];
   // Replace configStore with an in-memory fake so configure tests never touch the real config file.
-  let fakeConfig: PersistedConfig = defaultConfig();
+  // The fixture dir is registered as a folder: actions that reconcile (set_blacklist, add_folder)
+  // re-resolve folders from this config, and an empty list would send them scanning the built-in
+  // default under the developer's own home directory.
+  let fakeConfig: PersistedConfig = {
+    ...defaultConfig(),
+    folders: [{ path: fixtureDir, priority: 100, enabled: true, tags: [] }],
+  };
   deps.configStore = {
     load: async () => ({ ...fakeConfig }),
     save: async (c: PersistedConfig) => { fakeConfig = { ...c }; },
